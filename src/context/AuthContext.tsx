@@ -64,19 +64,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }
 
   useEffect(() => {
-    // 1. Ambil session aktif saat pertama kali load
+    let cancelled = false
+
+    // 1. Ambil session aktif saat pertama kali load, dengan timeout
+    const timeout = setTimeout(() => {
+      if (!cancelled) setLoading(false)
+    }, 8000)
+
     supabase.auth.getSession().then(({ data: { session } }) => {
+      if (cancelled) return
+      clearTimeout(timeout)
       setSession(session)
       setUser(session?.user ?? null)
       if (session?.user) {
         fetchProfile(session.user.id)
       }
       setLoading(false)
+    }).catch(() => {
+      if (!cancelled) { clearTimeout(timeout); setLoading(false) }
     })
 
     // 2. Dengarkan perubahan status autentikasi (login, logout, token refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, currentSession) => {
+        if (cancelled) return
         setSession(currentSession)
         setUser(currentSession?.user ?? null)
         
@@ -91,6 +102,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     )
 
     return () => {
+      cancelled = true
       subscription.unsubscribe()
     }
   }, [])

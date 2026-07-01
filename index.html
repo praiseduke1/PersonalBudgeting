@@ -15,13 +15,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
   </head>
   <body>
-    <div id="root">
-      <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif;background:#f8fafc;color:#1e293b">
-        <div style="text-align:center"><div style="border:3px solid #e2e8f0;border-top-color:#6366f1;border-radius:50%;width:32px;height:32px;animation:spinner .8s linear infinite;margin:0 auto 12px"></div><p>Memuat...</p></div>
-      </div>
-    </div>
-    <script>window.__appLoaded=!1;window.addEventListener('DOMContentLoaded',()=>{setTimeout(()=>{if(!window.__appLoaded){const d=document.getElementById('root');if(d){const e=sessionStorage.getItem('__app_err');d.innerHTML='<div style="display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif;background:#f8fafc;color:#1e293b;padding:2rem"><div style="max-width:480px;text-align:center"><h2 style="margin-bottom:8px">Sedang Memuat...</h2><p style="color:#64748b;margin-bottom:12px">Aplikasi membutuhkan waktu lebih lama dari biasanya.</p>'+(e?'<pre style="background:#f1f5f9;padding:12px;border-radius:8px;font-size:13px;text-align:left;overflow:auto;max-height:200px">'+e+'</pre>':'')+'<button onclick="location.reload()" style="margin-top:12px;padding:8px 20px;background:#6366f1;color:#fff;border:none;border-radius:8px;cursor:pointer">Muat Ulang</button></div>';}}},3000)});</script>
-    <style id="app-spinner">@keyframes spinner{to{transform:rotate(360deg)}}</style>
+    <div id="root"><div id="init-loader" style="display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:Inter,system-ui,sans-serif;background:#f8fafc;color:#1e293b"><div style="text-align:center"><div style="border:3px solid #e2e8f0;border-top-color:#6366f1;border-radius:50%;width:32px;height:32px;animation:spin .8s linear infinite;margin:0 auto 12px"></div><div style="font-size:14px;color:#64748b">Memuat...</div></div></div></div>
+    <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
