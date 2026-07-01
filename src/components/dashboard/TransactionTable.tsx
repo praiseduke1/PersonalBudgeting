@@ -1,10 +1,13 @@
+import { Pencil, Trash2 } from 'lucide-react'
 import { Transaction } from '../../types'
 
 interface TransactionTableProps {
   transactions: Transaction[]
+  onEdit: (t: Transaction) => void
+  onDelete: (id: string) => void
 }
 
-export default function TransactionTable({ transactions }: TransactionTableProps) {
+export default function TransactionTable({ transactions, onEdit, onDelete }: TransactionTableProps) {
   return (
     <section className="card">
       <h3 style={{ marginBottom: '1rem' }}>Mutasi Transaksi Terakhir (Isolated Tenant View)</h3>
@@ -17,12 +20,13 @@ export default function TransactionTable({ transactions }: TransactionTableProps
               <th>Deskripsi</th>
               <th>Tipe</th>
               <th style={{ textAlign: 'right' }}>Jumlah</th>
+              <th style={{ textAlign: 'center', width: '80px' }}>Aksi</th>
             </tr>
           </thead>
           <tbody>
             {transactions.length === 0 ? (
               <tr>
-                <td colSpan={5} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                <td colSpan={6} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
                   Belum ada transaksi. Klik "Catat Transaksi" untuk memulai.
                 </td>
               </tr>
@@ -49,6 +53,20 @@ export default function TransactionTable({ transactions }: TransactionTableProps
                   </td>
                   <td style={{ textAlign: 'right', fontWeight: 700, color: t.type === 'income' ? 'var(--success)' : 'var(--text-main)' }}>
                     {t.type === 'income' ? '+' : '-'} Rp {t.amount.toLocaleString('id-ID')}
+                  </td>
+                  <td style={{ textAlign: 'center' }}>
+                    <div style={{ display: 'flex', gap: '0.25rem', justifyContent: 'center' }}>
+                      <button onClick={() => onEdit(t)}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)', padding: '0.25rem' }}
+                        title="Edit">
+                        <Pencil size={16} />
+                      </button>
+                      <button onClick={() => onDelete(t.id)}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '0.25rem' }}
+                        title="Hapus">
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))

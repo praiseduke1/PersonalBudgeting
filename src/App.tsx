@@ -2,8 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from './context/AuthContext'
 import { supabase } from './lib/supabaseClient'
 import { PlusCircle, RefreshCw } from 'lucide-react'
-import { Transaction } from './types'
-import { Category } from './types'
+import { Transaction, Category } from './types'
 import LoadingScreen from './components/common/LoadingScreen'
 import AuthForm from './components/common/AuthForm'
 import Sidebar from './components/dashboard/Sidebar'
@@ -14,7 +13,8 @@ import TransactionTable from './components/dashboard/TransactionTable'
 
 export default function App() {
   const { user, profile, loading, signOut, refreshProfile } = useAuth()
-  const [showAddForm, setShowAddForm] = useState(false)
+  const [showForm, setShowForm] = useState(false)
+  const [editingTx, setEditingTx] = useState<Transaction | null>(null)
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [dataLoading, setDataLoading] = useState(false)
@@ -90,7 +90,7 @@ export default function App() {
             <h1>Dashboard Finansial</h1>
             <p>Selamat datang kembali! Lacak dan kelola anggaran bulanan Anda di sini.</p>
           </div>
-          <button onClick={() => setShowAddForm(true)} className="btn btn-primary">
+          <button onClick={() => { setEditingTx(null); setShowForm(true); }} className="btn btn-primary">
             <PlusCircle size={18} /> Catat Transaksi
           </button>
         </header>
@@ -114,16 +114,25 @@ export default function App() {
           balance={balance}
         />
 
-        {showAddForm && (
+        {showForm && (
           <TransactionForm
             userId={user.id}
             categories={categories}
-            onSaved={() => { setShowAddForm(false); fetchData() }}
-            onClose={() => setShowAddForm(false)}
+            editTransaction={editingTx}
+            onSaved={() => { setShowForm(false); setEditingTx(null); fetchData() }}
+            onClose={() => { setShowForm(false); setEditingTx(null) }}
           />
         )}
 
-        <TransactionTable transactions={transactions} />
+        <TransactionTable
+          transactions={transactions}
+          onEdit={(t) => { setEditingTx(t); setShowForm(true) }}
+          onDelete={async (id) => {
+            if (!confirm('Hapus transaksi ini?')) return
+            await supabase.from('transactions').delete().eq('id', id)
+            fetchData()
+          }}
+        />
       </main>
     </div>
   )

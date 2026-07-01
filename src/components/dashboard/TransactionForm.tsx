@@ -1,41 +1,52 @@
 import React from 'react'
 import { supabase } from '../../lib/supabaseClient'
-import { Category } from '../../types'
+import { Category, Transaction } from '../../types'
 
 interface TransactionFormProps {
   userId: string
   categories: Category[]
+  editTransaction?: Transaction | null
   onSaved: () => void
   onClose: () => void
 }
 
-export default function TransactionForm({ userId, categories, onSaved, onClose }: TransactionFormProps) {
-  const [type, setType] = React.useState<'income' | 'expense'>('expense')
-  const [amount, setAmount] = React.useState('')
-  const [category, setCategory] = React.useState('')
-  const [date, setDate] = React.useState(new Date().toISOString().split('T')[0])
-  const [desc, setDesc] = React.useState('')
+export default function TransactionForm({ userId, categories, editTransaction, onSaved, onClose }: TransactionFormProps) {
+  const [type, setType] = React.useState<'income' | 'expense'>(editTransaction?.type || 'expense')
+  const [amount, setAmount] = React.useState(editTransaction?.amount.toString() || '')
+  const [category, setCategory] = React.useState(editTransaction?.category_id || '')
+  const [date, setDate] = React.useState(
+    editTransaction?.transaction_date
+      ? new Date(editTransaction.transaction_date).toISOString().split('T')[0]
+      : new Date().toISOString().split('T')[0]
+  )
+  const [desc, setDesc] = React.useState(editTransaction?.description || '')
   const [error, setError] = React.useState('')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!amount || isNaN(Number(amount)) || !category) return
 
-    const { error: saveError } = await supabase.from('transactions').insert({
-      user_id: userId,
+    const payload = {
       category_id: category,
       amount: Number(amount),
       transaction_date: date,
       description: desc || null
-    })
+    }
+
+    let saveError
+    if (editTransaction) {
+      const { error } = await supabase.from('transactions').update(payload).eq('id', editTransaction.id)
+      saveError = error
+    } else {
+      const { error } = await supabase.from('transactions').insert({ ...payload, user_id: userId })
+      saveError = error
+    }
 
     if (saveError) {
       setError(saveError.message)
       return
     }
 
-    setAmount('')
-    setDesc('')
     onSaved()
   }
 
@@ -48,7 +59,7 @@ export default function TransactionForm({ userId, categories, onSaved, onClose }
       alignItems: 'center', zIndex: 100, backdropFilter: 'blur(4px)'
     }}>
       <div className="card" style={{ maxWidth: '480px', width: '100%', padding: '2rem' }}>
-        <h3 style={{ marginBottom: '1rem' }}>Tambah Transaksi Baru</h3>
+        <h3 style={{ marginBottom: '1rem' }}>{editTransaction ? 'Edit Transaksi' : 'Tambah Transaksi Baru'}</h3>
 
         {error && (
           <div style={{ background: 'var(--danger-light)', border: '1px solid var(--danger)', color: 'var(--danger)', padding: '0.75rem', borderRadius: 'var(--radius-sm)', marginBottom: '1rem', fontSize: '0.9rem' }}>
@@ -103,7 +114,7 @@ export default function TransactionForm({ userId, categories, onSaved, onClose }
           </div>
 
           <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1.5rem' }}>
-            <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>Simpan Transaksi</button>
+            <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>{editTransaction ? 'Simpan Perubahan' : 'Simpan Transaksi'}</button>
             <button type="button" onClick={onClose} className="btn btn-secondary">Batal</button>
           </div>
         </form>
