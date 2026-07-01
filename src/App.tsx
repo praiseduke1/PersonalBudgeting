@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from './context/AuthContext'
 import { supabase } from './lib/supabaseClient'
-import { PlusCircle, RefreshCw } from 'lucide-react'
+import { PlusCircle, RefreshCw, BarChart3, PieChart as PieChartIcon } from 'lucide-react'
+import ExpensePieChart from './components/dashboard/ExpensePieChart'
+import MonthlyTrendChart from './components/dashboard/MonthlyTrendChart'
 import { Transaction, Category } from './types'
 import LoadingScreen from './components/common/LoadingScreen'
 import AuthForm from './components/common/AuthForm'
@@ -126,6 +128,11 @@ export default function App() {
           totalExpense={totalExpense}
           balance={balance}
         />
+
+        <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
+          <ExpensePieChart transactions={transactions} />
+          <MonthlyTrendChart userId={user.id} />
+        </section>
 
         {showForm && (
           <TransactionForm
