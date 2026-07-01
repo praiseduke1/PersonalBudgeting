@@ -1,21 +1,22 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useCallback } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabaseClient'
 import toast from 'react-hot-toast'
-import { PlusCircle, RefreshCw, Menu, Tags } from 'lucide-react'
+import { PlusCircle, Menu, Tags, Download } from 'lucide-react'
 import ExpensePieChart from '../components/dashboard/ExpensePieChart'
 import MonthlyTrendChart from '../components/dashboard/MonthlyTrendChart'
-import { Transaction, Category } from '../types'
-import DashboardSkeleton from '../components/common/DashboardSkeleton'
 import BudgetSection from '../components/dashboard/BudgetSection'
 import SummaryCards from '../components/dashboard/SummaryCards'
 import TransactionForm from '../components/dashboard/TransactionForm'
 import TransactionTable from '../components/dashboard/TransactionTable'
 import CategoryManager from '../components/dashboard/CategoryManager'
 import ErrorAlert from '../components/common/ErrorAlert'
-
-const PAGE_SIZE = 20
+import DashboardSkeleton from '../components/common/DashboardSkeleton'
+import { useTransactions } from '../hooks/useTransactions'
+import { useCategories } from '../hooks/useCategories'
+import { exportTransactionsCSV } from '../utils/supabase'
+import { generateCSV, downloadFile, getCurrentMonth } from '../utils/format'
 
 interface OutletContext {
   sidebarOpen: boolean
@@ -26,91 +27,35 @@ export default function Dashboard() {
   const { user, profile, refreshProfile } = useAuth()
   const { setSidebarOpen } = useOutletContext<OutletContext>()
   const [showForm, setShowForm] = useState(false)
-  const [editingTx, setEditingTx] = useState<Transaction | null>(null)
-  const [transactions, setTransactions] = useState<Transaction[]>([])
-  const [categories, setCategories] = useState<Category[]>([])
-  const [dataLoading, setDataLoading] = useState(false)
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [fetchError, setFetchError] = useState('')
-  const [hasMore, setHasMore] = useState(true)
-  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7))
+  const [editingTx, setEditingTx] = useState<any>(null)
   const [showCategoryManager, setShowCategoryManager] = useState(false)
-  const monthRef = useRef(selectedMonth)
+  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth())
 
-  const fetchData = useCallback(async (page = 0, append = false) => {
-    if (!user) return
-    if (page === 0) setDataLoading(true)
-    else setLoadingMore(true)
-    setFetchError('')
+  const { transactions, loading, loadingMore, hasMore, error, loadMore, refresh } = useTransactions(user?.id, selectedMonth)
+  const { categories } = useCategories(user?.id)
 
-    const startDate = selectedMonth + '-01'
-    const endDate = new Date(new Date(startDate).getTime() + 31 * 24 * 60 * 60 * 1000)
-      .toISOString().slice(0, 10)
-
-    const from = page * PAGE_SIZE
-    const to = from + PAGE_SIZE - 1
-
-    const [txResult, catResult] = await Promise.all([
-      supabase
-        .from('transactions')
-        .select('*, categories(name, type)')
-        .eq('user_id', user.id)
-        .gte('transaction_date', startDate)
-        .lt('transaction_date', endDate)
-        .order('transaction_date', { ascending: false })
-        .range(from, to),
-      page === 0
-        ? supabase.from('categories').select('*').eq('user_id', user.id)
-        : Promise.resolve({ data: null, error: null })
-    ])
-
-    if (txResult.error) {
-      setFetchError('Gagal memuat transaksi: ' + txResult.error.message)
-      toast.error('Gagal memuat data transaksi')
-    } else if (txResult.data) {
-      const mapped = txResult.data.map(t => ({
-        id: t.id,
-        type: (t.categories as any)?.type || 'expense',
-        amount: Number(t.amount),
-        category: (t.categories as any)?.name || 'Unknown',
-        category_id: t.category_id,
-        transaction_date: t.transaction_date,
-        description: t.description
-      }))
-      setTransactions(prev => append ? [...prev, ...mapped] : mapped)
-      setHasMore(txResult.data.length === PAGE_SIZE)
-    }
-
-    if (catResult.data) {
-      setCategories(catResult.data as Category[])
-    }
-
-    setDataLoading(false)
-    setLoadingMore(false)
-  }, [user, selectedMonth])
-
-  useEffect(() => {
-    monthRef.current = selectedMonth
-    setTransactions([])
-    setHasMore(true)
-    fetchData(0)
-  }, [selectedMonth, fetchData])
-
-  const loadMore = () => {
-    const nextPage = Math.floor(transactions.length / PAGE_SIZE)
-    fetchData(nextPage, true)
-  }
-
-  const totalIncome = transactions
-    .filter(t => t.type === 'income')
-    .reduce((sum, t) => sum + t.amount, 0)
-
-  const totalExpense = transactions
-    .filter(t => t.type === 'expense')
-    .reduce((sum, t) => sum + t.amount, 0)
-
+  const totalIncome = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0)
+  const totalExpense = transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0)
   const balance = totalIncome - totalExpense
   const actualBudget = profile?.monthly_budget ?? 2500000
+
+  const handleExportCSV = useCallback(async () => {
+    if (!user) return
+    try {
+      const rows = await exportTransactionsCSV(user.id, selectedMonth)
+      if (rows.length === 0) {
+        toast.error('Tidak ada transaksi untuk diexport')
+        return
+      }
+      const headers = Object.keys(rows[0])
+      const data = rows.map(r => headers.map(h => String((r as any)[h])))
+      const csv = generateCSV(headers, data)
+      downloadFile(csv, `transaksi-${selectedMonth}.csv`)
+      toast.success(`Diexport ${rows.length} transaksi`)
+    } catch (err: any) {
+      toast.error('Gagal export: ' + err.message)
+    }
+  }, [user, selectedMonth])
 
   return (
     <div className="p-4 md:p-6 lg:p-8 max-w-7xl mx-auto">
@@ -138,11 +83,12 @@ export default function Dashboard() {
             onChange={(e) => setSelectedMonth(e.target.value)}
           />
           <button
-            onClick={() => { setEditingTx(null); setShowForm(true) }}
-            className="btn btn-primary whitespace-nowrap"
+            onClick={handleExportCSV}
+            className="btn btn-secondary"
+            style={{ padding: '0.5rem 0.75rem', lineHeight: 0 }}
+            title="Export CSV"
           >
-            <PlusCircle size={18} />
-            <span className="hidden sm:inline">Catat Transaksi</span>
+            <Download size={18} />
           </button>
           <button
             onClick={() => setShowCategoryManager(true)}
@@ -152,25 +98,21 @@ export default function Dashboard() {
           >
             <Tags size={18} />
           </button>
+          <button
+            onClick={() => { setEditingTx(null); setShowForm(true) }}
+            className="btn btn-primary whitespace-nowrap"
+          >
+            <PlusCircle size={18} />
+            <span className="hidden sm:inline">Catat Transaksi</span>
+          </button>
         </div>
       </header>
 
-      {dataLoading && transactions.length === 0 && categories.length === 0 ? (
+      {loading && transactions.length === 0 ? (
         <DashboardSkeleton />
       ) : (
         <>
-          {dataLoading && (
-            <div
-              className="flex items-center gap-2 mb-4 text-sm"
-              style={{ color: 'var(--text-muted)' }}
-            >
-              <RefreshCw className="pulse" size={16} /> Memuat data...
-            </div>
-          )}
-
-          {fetchError && (
-            <ErrorAlert message={fetchError} onRetry={() => fetchData(0)} />
-          )}
+          {error && <ErrorAlert message={error} onRetry={refresh} />}
 
           {user && (
             <BudgetSection
@@ -181,11 +123,7 @@ export default function Dashboard() {
             />
           )}
 
-          <SummaryCards
-            totalIncome={totalIncome}
-            totalExpense={totalExpense}
-            balance={balance}
-          />
+          <SummaryCards totalIncome={totalIncome} totalExpense={totalExpense} balance={balance} />
 
           <section className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 mb-6">
             <ExpensePieChart transactions={transactions} />
@@ -197,7 +135,7 @@ export default function Dashboard() {
               userId={user?.id ?? ''}
               categories={categories}
               editTransaction={editingTx}
-              onSaved={() => { setShowForm(false); setEditingTx(null); fetchData(0) }}
+              onSaved={() => { setShowForm(false); setEditingTx(null); refresh() }}
               onClose={() => { setShowForm(false); setEditingTx(null) }}
             />
           )}
@@ -206,7 +144,7 @@ export default function Dashboard() {
             <CategoryManager
               categories={categories}
               userId={user?.id ?? ''}
-              onRefresh={() => fetchData(0)}
+              onRefresh={refresh}
               onClose={() => setShowCategoryManager(false)}
             />
           )}
@@ -220,12 +158,8 @@ export default function Dashboard() {
             onDelete={async (id) => {
               if (!confirm('Hapus transaksi ini?')) return
               const { error } = await supabase.from('transactions').delete().eq('id', id)
-              if (error) {
-                toast.error('Gagal menghapus: ' + error.message)
-              } else {
-                toast.success('Transaksi dihapus')
-                fetchData(0)
-              }
+              if (error) toast.error('Gagal menghapus: ' + error.message)
+              else { toast.success('Transaksi dihapus'); refresh() }
             }}
           />
         </>

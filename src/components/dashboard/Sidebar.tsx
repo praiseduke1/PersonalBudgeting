@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
-import { Coins, Wallet, LogOut, User as UserIcon, Sun, Moon, X } from 'lucide-react'
+import { Coins, Wallet, LogOut, User as UserIcon, Sun, Moon, X, Settings, RotateCcw, Target } from 'lucide-react'
 import { User } from '@supabase/supabase-js'
 import { Profile } from '../../context/AuthContext'
 import { toggleTheme } from '../../lib/theme'
+import { useLocation, useNavigate } from 'react-router-dom'
 
 interface SidebarProps {
   user: User
@@ -12,8 +13,17 @@ interface SidebarProps {
   onClose: () => void
 }
 
+const navItems = [
+  { path: '/', label: 'Dashboard Utama', icon: Wallet },
+  { path: '/recurring', label: 'Transaksi Berulang', icon: RotateCcw },
+  { path: '/goals', label: 'Target Finansial', icon: Target },
+  { path: '/settings', label: 'Pengaturan', icon: Settings },
+]
+
 export default function Sidebar({ user, profile, signOut, isOpen, onClose }: SidebarProps) {
   const [isDark, setIsDark] = useState(document.documentElement.classList.contains('dark'))
+  const location = useLocation()
+  const navigate = useNavigate()
 
   const handleToggle = () => {
     toggleTheme()
@@ -34,9 +44,13 @@ export default function Sidebar({ user, profile, signOut, isOpen, onClose }: Sid
     }
   }, [isOpen, onClose])
 
+  const handleNav = (path: string) => {
+    navigate(path)
+    onClose()
+  }
+
   return (
     <>
-      {/* Overlay for mobile */}
       {isOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/50 lg:hidden"
@@ -44,7 +58,6 @@ export default function Sidebar({ user, profile, signOut, isOpen, onClose }: Sid
         />
       )}
 
-      {/* Sidebar */}
       <aside
         className={`
           fixed inset-y-0 left-0 z-50 w-72 flex flex-col
@@ -55,7 +68,6 @@ export default function Sidebar({ user, profile, signOut, isOpen, onClose }: Sid
           ${isOpen ? 'translate-x-0' : '-translate-x-full'}
         `}
       >
-        {/* Header */}
         <div>
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-3">
@@ -65,7 +77,7 @@ export default function Sidebar({ user, profile, signOut, isOpen, onClose }: Sid
               <div>
                 <h2 className="text-xl font-extrabold" style={{ color: 'var(--text-main)' }}>FinancerSaaS</h2>
                 <span className="text-xs block -mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                  Tenant: {profile?.full_name || user.email}
+                  {profile?.full_name || user.email}
                 </span>
               </div>
             </div>
@@ -80,17 +92,29 @@ export default function Sidebar({ user, profile, signOut, isOpen, onClose }: Sid
           </div>
 
           <nav className="flex flex-col gap-2">
-            <a
-              href="#"
-              className="btn btn-secondary flex items-center gap-2"
-              style={{ justifyContent: 'flex-start', background: 'var(--primary-light)', border: 'none', color: 'var(--primary)' }}
-            >
-              <Wallet size={18} /> Dashboard Utama
-            </a>
+            {navItems.map(item => {
+              const active = location.pathname === item.path
+              return (
+                <a
+                  key={item.path}
+                  href="#"
+                  onClick={(e) => { e.preventDefault(); handleNav(item.path) }}
+                  className="btn btn-secondary flex items-center gap-2"
+                  style={{
+                    justifyContent: 'flex-start',
+                    background: active ? 'var(--primary-light)' : 'transparent',
+                    border: 'none',
+                    color: active ? 'var(--primary)' : 'var(--text-main)',
+                    fontWeight: active ? 600 : 400
+                  }}
+                >
+                  <item.icon size={18} /> {item.label}
+                </a>
+              )
+            })}
           </nav>
         </div>
 
-        {/* Footer */}
         <div className="pt-6 border-t" style={{ borderColor: 'var(--border)' }}>
           <button
             onClick={handleToggle}

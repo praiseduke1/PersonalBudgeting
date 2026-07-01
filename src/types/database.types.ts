@@ -108,6 +108,107 @@ export interface Database {
           }
         ]
       }
+      recurring_transactions: {
+        Row: {
+          id: string
+          user_id: string
+          category_id: string
+          amount: number
+          type: 'income' | 'expense'
+          description: string | null
+          frequency: 'daily' | 'weekly' | 'monthly' | 'yearly'
+          next_date: string
+          end_date: string | null
+          is_active: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          category_id: string
+          amount: number
+          type: 'income' | 'expense'
+          description?: string | null
+          frequency: 'daily' | 'weekly' | 'monthly' | 'yearly'
+          next_date: string
+          end_date?: string | null
+          is_active?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          category_id?: string
+          amount?: number
+          type?: 'income' | 'expense'
+          description?: string | null
+          frequency?: 'daily' | 'weekly' | 'monthly' | 'yearly'
+          next_date?: string
+          end_date?: string | null
+          is_active?: boolean
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recurring_transactions_category_id_fkey"
+            columns: ["category_id"]
+            referencedRelation: "categories"
+            referencedSchema: "public"
+          },
+          {
+            foreignKeyName: "recurring_transactions_user_id_fkey"
+            columns: ["user_id"]
+            referencedRelation: "profiles"
+            referencedSchema: "public"
+          }
+        ]
+      }
+      financial_goals: {
+        Row: {
+          id: string
+          user_id: string
+          name: string
+          target_amount: number
+          current_amount: number
+          deadline: string | null
+          icon: string
+          color: string
+          is_completed: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          name: string
+          target_amount: number
+          current_amount?: number
+          deadline?: string | null
+          icon?: string
+          color?: string
+          is_completed?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          name?: string
+          target_amount?: number
+          current_amount?: number
+          deadline?: string | null
+          icon?: string
+          color?: string
+          is_completed?: boolean
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "financial_goals_user_id_fkey"
+            columns: ["user_id"]
+            referencedRelation: "profiles"
+            referencedSchema: "public"
+          }
+        ]
+      }
     }
     Views: {
       [_ in never]: never
