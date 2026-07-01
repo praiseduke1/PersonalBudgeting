@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Coins, Wallet, LogOut, User as UserIcon, Sun, Moon, X } from 'lucide-react'
 import { User } from '@supabase/supabase-js'
 import { Profile } from '../../context/AuthContext'
@@ -8,11 +8,11 @@ interface SidebarProps {
   user: User
   profile: Profile | null
   signOut: () => Promise<void>
-  open: boolean
+  isOpen: boolean
   onClose: () => void
 }
 
-export default function Sidebar({ user, profile, signOut, open, onClose }: SidebarProps) {
+export default function Sidebar({ user, profile, signOut, isOpen, onClose }: SidebarProps) {
   const [isDark, setIsDark] = useState(document.documentElement.classList.contains('dark'))
 
   const handleToggle = () => {
@@ -24,7 +24,7 @@ export default function Sidebar({ user, profile, signOut, open, onClose }: Sideb
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
     }
-    if (open) {
+    if (isOpen) {
       document.addEventListener('keydown', handleEscape)
       document.body.style.overflow = 'hidden'
     }
@@ -32,142 +32,96 @@ export default function Sidebar({ user, profile, signOut, open, onClose }: Sideb
       document.removeEventListener('keydown', handleEscape)
       document.body.style.overflow = ''
     }
-  }, [open, onClose])
-
-  const content = (
-    <>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2.5rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <div style={{ background: 'var(--primary-light)', padding: '0.5rem', borderRadius: '50%' }}>
-            <Coins size={24} style={{ color: 'var(--primary)', display: 'block' }} />
-          </div>
-          <div>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 800 }}>FinancerSaaS</h2>
-            <span style={{ fontSize: '0.7rem', display: 'block', color: 'var(--text-muted)', marginTop: '-4px' }}>
-              Tenant: {profile?.full_name || user.email}
-            </span>
-          </div>
-        </div>
-        <button onClick={onClose} className="btn btn-icon sidebar-close-btn"
-          aria-label="Tutup sidebar"
-          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '0.25rem', display: 'none' }}>
-          <X size={20} />
-        </button>
-      </div>
-
-      <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-        <a href="#" className="btn btn-secondary"
-          style={{ justifyContent: 'flex-start', background: 'var(--primary-light)', border: 'none', color: 'var(--primary)' }}>
-          <Wallet size={18} /> Dashboard Utama
-        </a>
-      </nav>
-
-      <div style={{ marginTop: 'auto', borderTop: '1px solid var(--border)', paddingTop: '1.5rem' }}>
-        <button onClick={handleToggle} className="btn btn-secondary btn-full"
-          style={{ marginBottom: '0.75rem', justifyContent: 'center' }}>
-          {isDark ? <Sun size={16} /> : <Moon size={16} />} {isDark ? 'Mode Terang' : 'Mode Gelap'}
-        </button>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-          <div style={{
-            background: 'var(--border)', width: '36px', height: '36px', borderRadius: '50%',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-main)'
-          }}>
-            <UserIcon size={18} />
-          </div>
-          <div style={{ overflow: 'hidden' }}>
-            <p style={{ fontWeight: 600, fontSize: '0.9rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {profile?.full_name || 'Tenant User'}
-            </p>
-            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {user.email}
-            </p>
-          </div>
-        </div>
-        <button onClick={signOut} className="btn btn-secondary btn-full"
-          style={{ color: 'var(--danger)', borderColor: 'rgba(244, 63, 94, 0.2)' }}>
-          <LogOut size={16} /> Keluar Sesi
-        </button>
-      </div>
-    </>
-  )
+  }, [isOpen, onClose])
 
   return (
     <>
-      {/* Desktop sidebar */}
-      <aside className="sidebar-desktop" style={{
-        width: '280px',
-        background: 'var(--bg-card)',
-        borderRight: '1px solid var(--border)',
-        padding: '2rem 1.5rem',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'space-between',
-        flexShrink: 0
-      }}>
-        {content}
-      </aside>
+      {/* Overlay for mobile */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          onClick={onClose}
+        />
+      )}
 
-      {/* Mobile sidebar */}
-      <div className={`sidebar-overlay${open ? ' open' : ''}`} onClick={onClose} />
-      <aside className={`sidebar-mobile${open ? ' open' : ''}`} style={{
-        background: 'var(--bg-card)',
-        borderRight: '1px solid var(--border)',
-        padding: '2rem 1.5rem',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'space-between'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2.5rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <div style={{ background: 'var(--primary-light)', padding: '0.5rem', borderRadius: '50%' }}>
-              <Coins size={24} style={{ color: 'var(--primary)', display: 'block' }} />
+      {/* Sidebar */}
+      <aside
+        className={`
+          fixed inset-y-0 left-0 z-50 w-72 flex flex-col
+          bg-[var(--bg-card)] border-r border-[var(--border)]
+          p-6 justify-between
+          transition-transform duration-300 ease-in-out
+          lg:static lg:translate-x-0 lg:z-auto
+          ${isOpen ? 'translate-x-0' : '-translate-x-full'}
+        `}
+      >
+        {/* Header */}
+        <div>
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-full" style={{ background: 'var(--primary-light)' }}>
+                <Coins size={24} style={{ color: 'var(--primary)', display: 'block' }} />
+              </div>
+              <div>
+                <h2 className="text-xl font-extrabold" style={{ color: 'var(--text-main)' }}>FinancerSaaS</h2>
+                <span className="text-xs block -mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                  Tenant: {profile?.full_name || user.email}
+                </span>
+              </div>
             </div>
-            <div>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 800 }}>FinancerSaaS</h2>
-              <span style={{ fontSize: '0.7rem', display: 'block', color: 'var(--text-muted)', marginTop: '-4px' }}>
-                Tenant: {profile?.full_name || user.email}
-              </span>
-            </div>
+            <button
+              onClick={onClose}
+              className="lg:hidden p-1 cursor-pointer"
+              style={{ background: 'none', border: 'none', color: 'var(--text-muted)' }}
+              aria-label="Tutup sidebar"
+            >
+              <X size={20} />
+            </button>
           </div>
-          <button onClick={onClose} className="btn btn-icon"
-            aria-label="Tutup sidebar"
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '0.25rem' }}>
-            <X size={20} />
-          </button>
+
+          <nav className="flex flex-col gap-2">
+            <a
+              href="#"
+              className="btn btn-secondary flex items-center gap-2"
+              style={{ justifyContent: 'flex-start', background: 'var(--primary-light)', border: 'none', color: 'var(--primary)' }}
+            >
+              <Wallet size={18} /> Dashboard Utama
+            </a>
+          </nav>
         </div>
 
-        <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          <a href="#" className="btn btn-secondary"
-            style={{ justifyContent: 'flex-start', background: 'var(--primary-light)', border: 'none', color: 'var(--primary)' }}>
-            <Wallet size={18} /> Dashboard Utama
-          </a>
-        </nav>
-
-        <div style={{ marginTop: 'auto', borderTop: '1px solid var(--border)', paddingTop: '1.5rem' }}>
-          <button onClick={handleToggle} className="btn btn-secondary btn-full"
-            style={{ marginBottom: '0.75rem', justifyContent: 'center' }}>
-            {isDark ? <Sun size={16} /> : <Moon size={16} />} {isDark ? 'Mode Terang' : 'Mode Gelap'}
+        {/* Footer */}
+        <div className="pt-6 border-t" style={{ borderColor: 'var(--border)' }}>
+          <button
+            onClick={handleToggle}
+            className="btn btn-secondary btn-full justify-center mb-3"
+          >
+            {isDark ? <Sun size={16} /> : <Moon size={16} />}
+            {isDark ? 'Mode Terang' : 'Mode Gelap'}
           </button>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-            <div style={{
-              background: 'var(--border)', width: '36px', height: '36px', borderRadius: '50%',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-main)'
-            }}>
+          <div className="flex items-center gap-3 mb-4">
+            <div
+              className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
+              style={{ background: 'var(--border)', color: 'var(--text-main)' }}
+            >
               <UserIcon size={18} />
             </div>
-            <div style={{ overflow: 'hidden' }}>
-              <p style={{ fontWeight: 600, fontSize: '0.9rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            <div className="min-w-0">
+              <p className="font-semibold text-sm truncate" style={{ color: 'var(--text-main)' }}>
                 {profile?.full_name || 'Tenant User'}
               </p>
-              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>
                 {user.email}
               </p>
             </div>
           </div>
-          <button onClick={signOut} className="btn btn-secondary btn-full"
-            style={{ color: 'var(--danger)', borderColor: 'rgba(244, 63, 94, 0.2)' }}>
+
+          <button
+            onClick={signOut}
+            className="btn btn-secondary btn-full"
+            style={{ color: 'var(--danger)', borderColor: 'rgba(244, 63, 94, 0.2)' }}
+          >
             <LogOut size={16} /> Keluar Sesi
           </button>
         </div>
