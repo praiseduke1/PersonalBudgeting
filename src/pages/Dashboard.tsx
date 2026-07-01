@@ -1,11 +1,11 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, lazy, Suspense } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabaseClient'
 import toast from 'react-hot-toast'
-import { PlusCircle, Menu, Tags, Download, BarChart3, PiggyBank } from 'lucide-react'
-import ExpensePieChart from '../components/dashboard/ExpensePieChart'
-import MonthlyTrendChart from '../components/dashboard/MonthlyTrendChart'
+import { PlusCircle, Menu, Tags, Download, BarChart3, PiggyBank, Loader2 } from 'lucide-react'
+const ExpensePieChart = lazy(() => import('../components/dashboard/ExpensePieChart'))
+const MonthlyTrendChart = lazy(() => import('../components/dashboard/MonthlyTrendChart'))
 import BudgetSection from '../components/dashboard/BudgetSection'
 import SummaryCards from '../components/dashboard/SummaryCards'
 import TransactionForm from '../components/dashboard/TransactionForm'
@@ -17,6 +17,7 @@ import { useTransactions } from '../hooks/useTransactions'
 import { useCategories } from '../hooks/useCategories'
 import { exportTransactionsCSV } from '../utils/supabase'
 import { generateCSV, downloadFile, getCurrentMonth, formatCurrency } from '../utils/format'
+import { fetchWithTimeout } from '../lib/timeout'
 import { useNavigate } from 'react-router-dom'
 
 interface OutletContext {
@@ -33,6 +34,7 @@ export default function Dashboard() {
   const [showCategoryManager, setShowCategoryManager] = useState(false)
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth())
   const [netWorth, setNetWorth] = useState<{ total_assets: number; total_liabilities: number; net_worth: number } | null>(null)
+  const [netWorthLoading, setNetWorthLoading] = useState(true)
 
   const { transactions, loading, loadingMore, hasMore, error, loadMore, refresh } = useTransactions(user?.id, selectedMonth)
   const { categories } = useCategories(user?.id)
@@ -44,19 +46,29 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!user) return
+    let cancelled = false
     const fetchNetWorth = async () => {
-      const [accResult, invResult, debtResult] = await Promise.all([
-        supabase.from('accounts').select('balance').eq('user_id', user.id),
-        supabase.from('investments').select('current_value').eq('user_id', user.id),
-        supabase.from('debts').select('remaining_amount, type').eq('user_id', user.id).eq('is_settled', false)
-      ])
-      const totalAssets = (accResult.data || []).reduce((s: number, a: any) => s + Number(a.balance), 0) +
-        (invResult.data || []).reduce((s: number, i: any) => s + Number(i.current_value), 0)
-      const receivables = (debtResult.data || []).filter((d: any) => d.type === 'receivable').reduce((s: number, d: any) => s + Number(d.remaining_amount), 0)
-      const debts = (debtResult.data || []).filter((d: any) => d.type === 'debt').reduce((s: number, d: any) => s + Number(d.remaining_amount), 0)
-      setNetWorth({ total_assets: totalAssets + receivables, total_liabilities: debts, net_worth: (totalAssets + receivables) - debts })
+      setNetWorthLoading(true)
+      try {
+        const [accResult, invResult, debtResult] = await fetchWithTimeout(Promise.all([
+          supabase.from('accounts').select('balance').eq('user_id', user.id),
+          supabase.from('investments').select('current_value').eq('user_id', user.id),
+          supabase.from('debts').select('remaining_amount, type').eq('user_id', user.id).eq('is_settled', false)
+        ]), 15000, 'netWorth')
+        if (cancelled) return
+        const totalAssets = (accResult.data || []).reduce((s: number, a: any) => s + Number(a.balance), 0) +
+          (invResult.data || []).reduce((s: number, i: any) => s + Number(i.current_value), 0)
+        const receivables = (debtResult.data || []).filter((d: any) => d.type === 'receivable').reduce((s: number, d: any) => s + Number(d.remaining_amount), 0)
+        const debts = (debtResult.data || []).filter((d: any) => d.type === 'debt').reduce((s: number, d: any) => s + Number(d.remaining_amount), 0)
+        if (!cancelled) setNetWorth({ total_assets: totalAssets + receivables, total_liabilities: debts, net_worth: (totalAssets + receivables) - debts })
+      } catch {
+        if (!cancelled) setNetWorth(null)
+      } finally {
+        if (!cancelled) setNetWorthLoading(false)
+      }
     }
     fetchNetWorth()
+    return () => { cancelled = true }
   }, [user])
 
   const handleExportCSV = useCallback(async () => {
@@ -107,7 +119,16 @@ export default function Dashboard() {
           {error && <ErrorAlert message={error} onRetry={refresh} />}
 
           {/* Net Worth Summary Card */}
-          {netWorth && (
+          {netWorthLoading ? (
+            <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+              {[1, 2, 3].map(i => (
+                <div key={i} className="card">
+                  <div className="skeleton" style={{ width: '100px', height: '14px', marginBottom: '0.5rem' }} />
+                  <div className="skeleton" style={{ width: '140px', height: '28px' }} />
+                </div>
+              ))}
+            </section>
+          ) : netWorth && (
             <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
               <div className="card" style={{ cursor: 'pointer' }} onClick={() => navigate('/net-worth')}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
@@ -145,8 +166,12 @@ export default function Dashboard() {
           <SummaryCards totalIncome={totalIncome} totalExpense={totalExpense} balance={balance} />
 
           <section className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 mb-6">
-            <ExpensePieChart transactions={transactions} />
-            <MonthlyTrendChart userId={user?.id ?? ''} />
+            <Suspense fallback={<div className="card" style={{ height: 340, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}><Loader2 size={24} className="pulse" /></div>}>
+              <ExpensePieChart transactions={transactions} />
+            </Suspense>
+            <Suspense fallback={<div className="card" style={{ height: 340, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}><Loader2 size={24} className="pulse" /></div>}>
+              <MonthlyTrendChart userId={user?.id ?? ''} />
+            </Suspense>
           </section>
 
           {showForm && (

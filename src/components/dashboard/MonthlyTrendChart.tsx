@@ -1,56 +1,31 @@
 import { useState, useEffect } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
-import { supabase } from '../../lib/supabaseClient'
-import { AlertTriangle } from 'lucide-react'
+import { AlertTriangle, Loader2 } from 'lucide-react'
+import { fetchTransactionTrend } from '../../utils/supabase'
+import { fetchWithTimeout } from '../../lib/timeout'
 
 interface MonthlyTrendChartProps {
   userId: string
 }
 
-const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des']
-
 export default function MonthlyTrendChart({ userId }: MonthlyTrendChartProps) {
   const [data, setData] = useState<{ month: string; income: number; expense: number }[]>([])
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   useEffect(() => {
     let cancelled = false
     const fetchTrend = async () => {
+      setLoading(true)
       setError('')
-      const months: { month: string; income: number; expense: number }[] = []
-      const now = new Date()
-
-      for (let i = 5; i >= 0; i--) {
-        const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-        const startDate = d.toISOString().slice(0, 10)
-        const endDate = new Date(d.getFullYear(), d.getMonth() + 1, 1).toISOString().slice(0, 10)
-
-        const { data: txData, error: txError } = await supabase
-          .from('transactions')
-          .select('*, categories(type)')
-          .eq('user_id', userId)
-          .gte('transaction_date', startDate)
-          .lt('transaction_date', endDate)
-
-        if (txError) {
-          if (!cancelled) setError('Gagal memuat data tren')
-          return
-        }
-
-        let income = 0, expense = 0
-        txData?.forEach(t => {
-          if ((t.categories as any)?.type === 'income') income += Number(t.amount)
-          else expense += Number(t.amount)
-        })
-
-        months.push({
-          month: MONTH_NAMES[d.getMonth()],
-          income,
-          expense
-        })
+      try {
+        const months = await fetchWithTimeout(fetchTransactionTrend(userId, 5), 20000, 'MonthlyTrendChart')
+        if (!cancelled) setData(months)
+      } catch (err: any) {
+        if (!cancelled) setError(err?.message || 'Gagal memuat data tren')
+      } finally {
+        if (!cancelled) setLoading(false)
       }
-
-      if (!cancelled) setData(months)
     }
 
     fetchTrend()
@@ -64,6 +39,11 @@ export default function MonthlyTrendChart({ userId }: MonthlyTrendChartProps) {
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 280, color: 'var(--danger)', gap: '0.5rem' }}>
           <AlertTriangle size={24} />
           <p style={{ fontSize: '0.9rem' }}>{error}</p>
+        </div>
+      ) : loading ? (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 280, color: 'var(--text-muted)', gap: '0.5rem' }}>
+          <Loader2 size={24} className="pulse" />
+          <p>Memuat data tren...</p>
         </div>
       ) : data.length === 0 ? (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 280, color: 'var(--text-muted)' }}>

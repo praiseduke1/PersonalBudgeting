@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { User, Session } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabaseClient'
+import { fetchWithTimeout } from '../lib/timeout'
 
 export interface Profile {
   id: string
@@ -20,7 +21,6 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-// Coba baca session dari localStorage langsung (synchronous)
 function getStoredSession(): Session | null {
   try {
     const raw = localStorage.getItem('sb-vonqbibvkxmetyvzcqeo-auth-token')
@@ -40,16 +40,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState<boolean>(false)
 
   const fetchProfile = async (userId: string) => {
+    console.time('fetchProfile')
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single()
+      const { data, error } = await fetchWithTimeout(
+        supabase.from('profiles').select('*').eq('id', userId).single(),
+        10000,
+        'fetchProfile'
+      )
 
       if (error) {
         if (error.code === 'PGRST116') {
-          // Row tidak ditemukan, mungkin trigger Supabase belum selesai/dibuat
           console.warn('Profil tenant tidak ditemukan di tabel database.')
           setProfile(null)
         } else {
@@ -60,6 +60,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } catch (err) {
       console.error('Error saat mengambil data profil:', err)
+      setProfile(null)
+    } finally {
+      console.timeEnd('fetchProfile')
     }
   }
 
@@ -77,14 +80,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }
 
   useEffect(() => {
-    // Verifikasi session di background (tidak blocking UI)
+    console.time('authInit')
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
       setUser(session?.user ?? null)
       if (session?.user) {
         fetchProfile(session.user.id)
       }
-    }).catch(() => {})
+      console.timeEnd('authInit')
+    }).catch(() => { console.timeEnd('authInit') })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, currentSession) => {

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabaseClient'
 import { Account, AccountTransfer, Category } from '../types'
@@ -6,6 +6,7 @@ import toast from 'react-hot-toast'
 import { Wallet, Plus, Pencil, Trash2, X, Check, Loader2, ArrowLeft, Send, Ban } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { formatCurrency, formatDate } from '../utils/format'
+import { fetchWithTimeout } from '../lib/timeout'
 
 const ACCOUNT_TYPES = [
   { value: 'cash', label: 'Tunai' },
@@ -32,21 +33,35 @@ export default function AccountsPage() {
   const [transferForm, setTransferForm] = useState({ from_account_id: '', to_account_id: '', amount: '', description: '', transfer_date: new Date().toISOString().split('T')[0] })
   const [saving, setSaving] = useState(false)
 
+  const cancelledRef = useRef(false)
+
   const loadData = async () => {
     if (!user) return
+    cancelledRef.current = false
     setLoading(true)
-    const [accResult, trfResult] = await Promise.all([
-      supabase.from('accounts').select('*').eq('user_id', user.id).order('name'),
-      supabase.from('account_transfers').select('*').eq('user_id', user.id).order('transfer_date', { ascending: false }).limit(20)
-    ])
-    if (accResult.error) toast.error('Gagal memuat akun')
-    else setAccounts(accResult.data as Account[])
-    if (trfResult.error) toast.error('Gagal memuat transfer')
-    else setTransfers(trfResult.data as AccountTransfer[])
-    setLoading(false)
+    try {
+      const [accResult, trfResult] = await fetchWithTimeout(Promise.all([
+        supabase.from('accounts').select('*').eq('user_id', user.id).order('name'),
+        supabase.from('account_transfers').select('*').eq('user_id', user.id).order('transfer_date', { ascending: false }).limit(20)
+      ]), 15000, 'loadAccounts')
+      if (cancelledRef.current) return
+      if (accResult.error) toast.error('Gagal memuat akun')
+      else setAccounts(accResult.data as Account[])
+      if (trfResult.error) toast.error('Gagal memuat transfer')
+      else setTransfers(trfResult.data as AccountTransfer[])
+    } catch (err: any) {
+      if (!cancelledRef.current) {
+        toast.error('Gagal memuat data: ' + (err.message || 'timeout'))
+      }
+    } finally {
+      if (!cancelledRef.current) setLoading(false)
+    }
   }
 
-  useEffect(() => { loadData() }, [user])
+  useEffect(() => {
+    cancelledRef.current = true
+    loadData()
+  }, [user])
 
   const openEdit = (a: Account) => {
     setEditing(a)

@@ -26,9 +26,11 @@ export default function TransactionForm({ userId, categories, editTransaction, o
   const [accountId, setAccountId] = React.useState('')
 
   useEffect(() => {
+    let cancelled = false
     supabase.from('accounts').select('*').eq('user_id', userId).eq('is_active', true).then(({ data }) => {
-      if (data) setAccounts(data as Account[])
-    })
+      if (!cancelled && data) setAccounts(data as Account[])
+    }).catch(() => {})
+    return () => { cancelled = true }
   }, [userId])
 
   const updateAccountBalance = async (accId: string, change: number) => {

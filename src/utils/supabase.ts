@@ -46,34 +46,41 @@ export async function fetchCategories(userId: string): Promise<Category[]> {
   return (data || []) as Category[]
 }
 
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des']
+
 export async function fetchTransactionTrend(userId: string, monthsBack = 5) {
-  const months: { month: string; income: number; expense: number }[] = []
   const now = new Date()
+  const ranges = Array.from({ length: monthsBack + 1 }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - (monthsBack - i), 1)
+    return {
+      index: i,
+      month: MONTH_NAMES[d.getMonth()],
+      startDate: d.toISOString().slice(0, 10),
+      endDate: new Date(d.getFullYear(), d.getMonth() + 1, 1).toISOString().slice(0, 10)
+    }
+  })
 
-  for (let i = monthsBack; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-    const startDate = d.toISOString().slice(0, 10)
-    const endDate = new Date(d.getFullYear(), d.getMonth() + 1, 1).toISOString().slice(0, 10)
+  const results = await Promise.all(
+    ranges.map(r =>
+      supabase
+        .from('transactions')
+        .select('*, categories(type)')
+        .eq('user_id', userId)
+        .gte('transaction_date', r.startDate)
+        .lt('transaction_date', r.endDate)
+        .then(({ data, error }) => {
+          if (error) throw error
+          let income = 0, expense = 0
+          data?.forEach(t => {
+            if ((t.categories as any)?.type === 'income') income += Number(t.amount)
+            else expense += Number(t.amount)
+          })
+          return { month: r.month, income, expense }
+        })
+    )
+  )
 
-    const { data: txData, error } = await supabase
-      .from('transactions')
-      .select('*, categories(type)')
-      .eq('user_id', userId)
-      .gte('transaction_date', startDate)
-      .lt('transaction_date', endDate)
-
-    if (error) throw error
-
-    let income = 0, expense = 0
-    txData?.forEach(t => {
-      if ((t.categories as any)?.type === 'income') income += Number(t.amount)
-      else expense += Number(t.amount)
-    })
-
-    months.push({ month: ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'][d.getMonth()], income, expense })
-  }
-
-  return months
+  return results
 }
 
 export async function exportTransactionsCSV(userId: string, selectedMonth: string) {
