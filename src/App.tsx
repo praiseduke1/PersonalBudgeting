@@ -7,6 +7,7 @@ import ExpensePieChart from './components/dashboard/ExpensePieChart'
 import MonthlyTrendChart from './components/dashboard/MonthlyTrendChart'
 import { Transaction, Category } from './types'
 import LoadingScreen from './components/common/LoadingScreen'
+import DashboardSkeleton from './components/common/DashboardSkeleton'
 import AuthForm from './components/common/AuthForm'
 import Sidebar from './components/dashboard/Sidebar'
 import BudgetSection from './components/dashboard/BudgetSection'
@@ -111,55 +112,60 @@ export default function App() {
           </div>
         </header>
 
-        {dataLoading && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-            <RefreshCw className="pulse" size={16} /> Memuat data...
-          </div>
-        )}
+        {dataLoading && transactions.length === 0 && categories.length === 0 ? (
+          <DashboardSkeleton />
+        ) : (
+          <>
+            {dataLoading && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                <RefreshCw className="pulse" size={16} /> Memuat data...
+              </div>
+            )}
 
-        <BudgetSection
-          userId={user.id}
-          actualBudget={actualBudget}
-          totalExpense={totalExpense}
-          onBudgetUpdated={refreshProfile}
-        />
+            <BudgetSection
+              userId={user.id}
+              actualBudget={actualBudget}
+              totalExpense={totalExpense}
+              onBudgetUpdated={refreshProfile}
+            />
 
-        <SummaryCards
-          totalIncome={totalIncome}
-          totalExpense={totalExpense}
-          balance={balance}
-        />
+            <SummaryCards
+              totalIncome={totalIncome}
+              totalExpense={totalExpense}
+              balance={balance}
+            />
 
-        <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
-          <ExpensePieChart transactions={transactions} />
-          <MonthlyTrendChart userId={user.id} />
-        </section>
+            <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
+              <ExpensePieChart transactions={transactions} />
+              <MonthlyTrendChart userId={user.id} />
+            </section>
 
-        {showForm && (
-          <TransactionForm
-            userId={user.id}
-            categories={categories}
-            editTransaction={editingTx}
-            onSaved={() => { setShowForm(false); setEditingTx(null); fetchData() }}
-            onClose={() => { setShowForm(false); setEditingTx(null) }}
-          />
-        )}
+            {showForm && (
+              <TransactionForm
+                userId={user.id}
+                categories={categories}
+                editTransaction={editingTx}
+                onSaved={() => { setShowForm(false); setEditingTx(null); fetchData() }}
+                onClose={() => { setShowForm(false); setEditingTx(null) }}
+              />
+            )}
 
-        <TransactionTable
-          transactions={transactions}
-          onEdit={(t) => { setEditingTx(t); setShowForm(true) }}
-          onDelete={async (id) => {
-            if (!confirm('Hapus transaksi ini?')) return
-            const { error } = await supabase.from('transactions').delete().eq('id', id)
-            if (error) {
-              toast.error('Gagal menghapus: ' + error.message)
-            } else {
-              toast.success('Transaksi dihapus')
-              fetchData()
-            }
-          }}
-        />
-      </main>
+            <TransactionTable
+              transactions={transactions}
+              onEdit={(t) => { setEditingTx(t); setShowForm(true) }}
+              onDelete={async (id) => {
+                if (!confirm('Hapus transaksi ini?')) return
+                const { error } = await supabase.from('transactions').delete().eq('id', id)
+                if (error) {
+                  toast.error('Gagal menghapus: ' + error.message)
+                } else {
+                  toast.success('Transaksi dihapus')
+                  fetchData()
+                }
+              }}
+            />
+          </>
+        )}</main>
     </div>
   )
 }

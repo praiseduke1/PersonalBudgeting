@@ -1,6 +1,8 @@
-import { Coins, Wallet, LogOut, User as UserIcon } from 'lucide-react'
+import { useState } from 'react'
+import { Coins, Wallet, LogOut, User as UserIcon, Sun, Moon } from 'lucide-react'
 import { User } from '@supabase/supabase-js'
 import { Profile } from '../../context/AuthContext'
+import { toggleTheme } from '../../lib/theme'
 
 interface SidebarProps {
   user: User
@@ -9,6 +11,13 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ user, profile, signOut }: SidebarProps) {
+  const [isDark, setIsDark] = useState(document.documentElement.classList.contains('dark'))
+
+  const handleToggle = () => {
+    toggleTheme()
+    setIsDark(!isDark)
+  }
+
   return (
     <aside style={{
       width: '280px',
@@ -41,6 +50,11 @@ export default function Sidebar({ user, profile, signOut }: SidebarProps) {
       </div>
 
       <div style={{ borderTop: '1px solid var(--border)', paddingTop: '1.5rem' }}>
+        <button onClick={handleToggle} className="btn btn-secondary btn-full"
+          style={{ marginBottom: '0.75rem', justifyContent: 'center' }}>
+          {isDark ? <Sun size={16} /> : <Moon size={16} />} {isDark ? 'Mode Terang' : 'Mode Gelap'}
+        </button>
+
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
           <div style={{
             background: 'var(--border)', width: '36px', height: '36px', borderRadius: '50%',

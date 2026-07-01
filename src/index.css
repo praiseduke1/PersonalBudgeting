@@ -61,6 +61,52 @@
   }
 }
 
+/* Manual override - light mode locked */
+html:not(.dark) {
+  --bg-app: #f8fafc;
+  --bg-card: rgba(255, 255, 255, 0.8);
+  --bg-card-hover: rgba(255, 255, 255, 0.95);
+  --primary: hsl(243, 75%, 59%);
+  --primary-hover: hsl(243, 75%, 52%);
+  --primary-light: rgba(99, 102, 241, 0.1);
+  --success: hsl(142, 71%, 45%);
+  --success-light: rgba(16, 185, 129, 0.1);
+  --danger: hsl(350, 89%, 60%);
+  --danger-light: rgba(244, 63, 94, 0.1);
+  --warning: hsl(38, 92%, 50%);
+  --warning-light: rgba(245, 158, 11, 0.1);
+  --text-main: hsl(222, 47%, 11%);
+  --text-muted: hsl(215, 16%, 47%);
+  --border: hsl(214, 32%, 91%);
+  --border-focus: hsl(243, 75%, 75%);
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+}
+
+/* Manual override - dark mode locked */
+html.dark {
+  --bg-app: hsl(222, 47%, 6%);
+  --bg-card: rgba(15, 23, 42, 0.65);
+  --bg-card-hover: rgba(30, 41, 59, 0.8);
+  --primary: hsl(245, 82%, 67%);
+  --primary-hover: hsl(245, 82%, 73%);
+  --primary-light: rgba(129, 140, 248, 0.15);
+  --success: #10b981;
+  --success-light: rgba(16, 185, 129, 0.15);
+  --danger: #f43f5e;
+  --danger-light: rgba(244, 63, 94, 0.15);
+  --warning: #f59e0b;
+  --warning-light: rgba(245, 158, 11, 0.15);
+  --text-main: hsl(210, 40%, 98%);
+  --text-muted: hsl(215, 20%, 65%);
+  --border: rgba(51, 65, 85, 0.5);
+  --border-focus: hsl(245, 82%, 80%);
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.5);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.3), 0 2px 4px -2px rgb(0 0 0 / 0.3);
+  --shadow-lg: 0 20px 25px -5px rgb(0 0 0 / 0.4), 0 8px 10px -6px rgb(0 0 0 / 0.4);
+}
+
 /* Reset & Base Styles */
 *, *::before, *::after {
   box-sizing: border-box;
@@ -246,6 +292,18 @@ p {
 
 .pulse {
   animation: pulse-slow 3s infinite ease-in-out;
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, var(--border) 25%, var(--bg-card-hover) 50%, var(--border) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite ease-in-out;
+  border-radius: var(--radius-sm);
 }
 
 /* Progress bar for Budget Limits */
