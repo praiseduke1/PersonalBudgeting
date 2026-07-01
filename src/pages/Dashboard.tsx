@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabaseClient'
@@ -14,6 +14,8 @@ import TransactionForm from '../components/dashboard/TransactionForm'
 import TransactionTable from '../components/dashboard/TransactionTable'
 import ErrorAlert from '../components/common/ErrorAlert'
 
+const PAGE_SIZE = 20
+
 interface OutletContext {
   sidebarOpen: boolean
   setSidebarOpen: (open: boolean) => void
@@ -27,17 +29,24 @@ export default function Dashboard() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [dataLoading, setDataLoading] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [fetchError, setFetchError] = useState('')
+  const [hasMore, setHasMore] = useState(true)
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7))
+  const monthRef = useRef(selectedMonth)
 
-  const fetchData = useCallback(async (retries = 2) => {
+  const fetchData = useCallback(async (page = 0, append = false) => {
     if (!user) return
-    setDataLoading(true)
+    if (page === 0) setDataLoading(true)
+    else setLoadingMore(true)
     setFetchError('')
 
     const startDate = selectedMonth + '-01'
     const endDate = new Date(new Date(startDate).getTime() + 31 * 24 * 60 * 60 * 1000)
       .toISOString().slice(0, 10)
+
+    const from = page * PAGE_SIZE
+    const to = from + PAGE_SIZE - 1
 
     const [txResult, catResult] = await Promise.all([
       supabase
@@ -47,22 +56,17 @@ export default function Dashboard() {
         .gte('transaction_date', startDate)
         .lt('transaction_date', endDate)
         .order('transaction_date', { ascending: false })
-        .limit(50),
-      supabase
-        .from('categories')
-        .select('*')
-        .eq('user_id', user.id)
+        .range(from, to),
+      page === 0
+        ? supabase.from('categories').select('*').eq('user_id', user.id)
+        : Promise.resolve({ data: null, error: null })
     ])
 
     if (txResult.error) {
-      if (retries > 0) {
-        setTimeout(() => fetchData(retries - 1), 1500)
-        return
-      }
       setFetchError('Gagal memuat transaksi: ' + txResult.error.message)
       toast.error('Gagal memuat data transaksi')
     } else if (txResult.data) {
-      setTransactions(txResult.data.map(t => ({
+      const mapped = txResult.data.map(t => ({
         id: t.id,
         type: (t.categories as any)?.type || 'expense',
         amount: Number(t.amount),
@@ -70,24 +74,30 @@ export default function Dashboard() {
         category_id: t.category_id,
         transaction_date: t.transaction_date,
         description: t.description
-      })))
+      }))
+      setTransactions(prev => append ? [...prev, ...mapped] : mapped)
+      setHasMore(txResult.data.length === PAGE_SIZE)
     }
 
-    if (catResult.error) {
-      setFetchError(prev => prev || 'Gagal memuat kategori')
-      toast.error('Gagal memuat data kategori')
-    } else if (catResult.data) {
+    if (catResult.data) {
       setCategories(catResult.data as Category[])
     }
 
     setDataLoading(false)
+    setLoadingMore(false)
   }, [user, selectedMonth])
 
   useEffect(() => {
-    if (user) {
-      fetchData()
-    }
-  }, [user, fetchData])
+    monthRef.current = selectedMonth
+    setTransactions([])
+    setHasMore(true)
+    fetchData(0)
+  }, [selectedMonth, fetchData])
+
+  const loadMore = () => {
+    const nextPage = Math.floor(transactions.length / PAGE_SIZE)
+    fetchData(nextPage, true)
+  }
 
   const totalIncome = transactions
     .filter(t => t.type === 'income')
@@ -102,7 +112,6 @@ export default function Dashboard() {
 
   return (
     <div className="p-4 md:p-6 lg:p-8 max-w-7xl mx-auto">
-      {/* Header */}
       <header className="flex items-center justify-between mb-6 gap-3">
         <div className="flex items-center gap-3 min-w-0">
           <button
@@ -136,7 +145,6 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {/* Content */}
       {dataLoading && transactions.length === 0 && categories.length === 0 ? (
         <DashboardSkeleton />
       ) : (
@@ -151,7 +159,7 @@ export default function Dashboard() {
           )}
 
           {fetchError && (
-            <ErrorAlert message={fetchError} onRetry={() => fetchData()} />
+            <ErrorAlert message={fetchError} onRetry={() => fetchData(0)} />
           )}
 
           {user && (
@@ -179,13 +187,16 @@ export default function Dashboard() {
               userId={user?.id ?? ''}
               categories={categories}
               editTransaction={editingTx}
-              onSaved={() => { setShowForm(false); setEditingTx(null); fetchData() }}
+              onSaved={() => { setShowForm(false); setEditingTx(null); fetchData(0) }}
               onClose={() => { setShowForm(false); setEditingTx(null) }}
             />
           )}
 
           <TransactionTable
             transactions={transactions}
+            hasMore={hasMore}
+            loadingMore={loadingMore}
+            onLoadMore={loadMore}
             onEdit={(t) => { setEditingTx(t); setShowForm(true) }}
             onDelete={async (id) => {
               if (!confirm('Hapus transaksi ini?')) return
@@ -194,7 +205,7 @@ export default function Dashboard() {
                 toast.error('Gagal menghapus: ' + error.message)
               } else {
                 toast.success('Transaksi dihapus')
-                fetchData()
+                fetchData(0)
               }
             }}
           />

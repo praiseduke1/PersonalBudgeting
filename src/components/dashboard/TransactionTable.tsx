@@ -1,16 +1,21 @@
-import { Pencil, Trash2 } from 'lucide-react'
+import { Pencil, Trash2, ChevronDown, Loader2 } from 'lucide-react'
 import { Transaction } from '../../types'
 
 interface TransactionTableProps {
   transactions: Transaction[]
+  hasMore: boolean
+  loadingMore: boolean
+  onLoadMore: () => void
   onEdit: (t: Transaction) => void
   onDelete: (id: string) => void
 }
 
-export default function TransactionTable({ transactions, onEdit, onDelete }: TransactionTableProps) {
+export default function TransactionTable({
+  transactions, hasMore, loadingMore, onLoadMore, onEdit, onDelete
+}: TransactionTableProps) {
   return (
     <section className="card">
-      <h3 style={{ marginBottom: '1rem' }}>Mutasi Transaksi Terakhir (Isolated Tenant View)</h3>
+      <h3 style={{ marginBottom: '1rem' }}>Mutasi Transaksi</h3>
       <div className="table-container">
         <table className="table">
           <thead>
@@ -74,6 +79,29 @@ export default function TransactionTable({ transactions, onEdit, onDelete }: Tra
           </tbody>
         </table>
       </div>
+
+      {hasMore && (
+        <div style={{ textAlign: 'center', marginTop: '1rem' }}>
+          <button
+            onClick={onLoadMore}
+            disabled={loadingMore}
+            className="btn btn-secondary"
+            style={{ minWidth: '160px', justifyContent: 'center' }}
+          >
+            {loadingMore ? (
+              <><Loader2 size={16} className="pulse" /> Memuat...</>
+            ) : (
+              <><ChevronDown size={16} /> Muat Lainnya</>
+            )}
+          </button>
+        </div>
+      )}
+
+      {!hasMore && transactions.length > 0 && (
+        <p style={{ textAlign: 'center', marginTop: '1rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+          Semua transaksi telah dimuat ({transactions.length})
+        </p>
+      )}
     </section>
   )
 }
