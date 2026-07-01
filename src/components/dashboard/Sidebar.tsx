@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Coins, Wallet, LogOut, User as UserIcon, Sun, Moon, X, Settings, RotateCcw, Target } from 'lucide-react'
+import { Coins, Wallet, LogOut, User as UserIcon, Sun, Moon, X, Settings, RotateCcw, Target, Landmark, TrendingUp, CircleDollarSign, BarChart3, PiggyBank } from 'lucide-react'
 import { User } from '@supabase/supabase-js'
 import { Profile } from '../../context/AuthContext'
 import { toggleTheme } from '../../lib/theme'
@@ -15,8 +15,13 @@ interface SidebarProps {
 
 const navItems = [
   { path: '/', label: 'Dashboard Utama', icon: Wallet },
+  { path: '/accounts', label: 'Akun & Rekening', icon: Landmark },
+  { path: '/budget-categories', label: 'Anggaran per Kategori', icon: PiggyBank },
   { path: '/recurring', label: 'Transaksi Berulang', icon: RotateCcw },
   { path: '/goals', label: 'Target Finansial', icon: Target },
+  { path: '/investments', label: 'Investasi', icon: TrendingUp },
+  { path: '/debts', label: 'Utang & Piutang', icon: CircleDollarSign },
+  { path: '/net-worth', label: 'Net Worth', icon: BarChart3 },
   { path: '/settings', label: 'Pengaturan', icon: Settings },
 ]
 
@@ -91,7 +96,7 @@ export default function Sidebar({ user, profile, signOut, isOpen, onClose }: Sid
             </button>
           </div>
 
-          <nav className="flex flex-col gap-2">
+          <nav className="flex flex-col gap-1 overflow-y-auto max-h-[calc(100vh-20rem)]" style={{ scrollbarWidth: 'thin' }}>
             {navItems.map(item => {
               const active = location.pathname === item.path
               return (
@@ -105,7 +110,9 @@ export default function Sidebar({ user, profile, signOut, isOpen, onClose }: Sid
                     background: active ? 'var(--primary-light)' : 'transparent',
                     border: 'none',
                     color: active ? 'var(--primary)' : 'var(--text-main)',
-                    fontWeight: active ? 600 : 400
+                    fontWeight: active ? 600 : 400,
+                    padding: '0.5rem 0.75rem',
+                    fontSize: '0.9rem'
                   }}
                 >
                   <item.icon size={18} /> {item.label}
@@ -115,7 +122,7 @@ export default function Sidebar({ user, profile, signOut, isOpen, onClose }: Sid
           </nav>
         </div>
 
-        <div className="pt-6 border-t" style={{ borderColor: 'var(--border)' }}>
+        <div className="pt-4 border-t" style={{ borderColor: 'var(--border)' }}>
           <button
             onClick={handleToggle}
             className="btn btn-secondary btn-full justify-center mb-3"
@@ -124,11 +131,8 @@ export default function Sidebar({ user, profile, signOut, isOpen, onClose }: Sid
             {isDark ? 'Mode Terang' : 'Mode Gelap'}
           </button>
 
-          <div className="flex items-center gap-3 mb-4">
-            <div
-              className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
-              style={{ background: 'var(--border)', color: 'var(--text-main)' }}
-            >
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'var(--border)', color: 'var(--text-main)' }}>
               <UserIcon size={18} />
             </div>
             <div className="min-w-0">
@@ -141,11 +145,7 @@ export default function Sidebar({ user, profile, signOut, isOpen, onClose }: Sid
             </div>
           </div>
 
-          <button
-            onClick={signOut}
-            className="btn btn-secondary btn-full"
-            style={{ color: 'var(--danger)', borderColor: 'rgba(244, 63, 94, 0.2)' }}
-          >
+          <button onClick={signOut} className="btn btn-secondary btn-full" style={{ color: 'var(--danger)', borderColor: 'rgba(244, 63, 94, 0.2)' }}>
             <LogOut size={16} /> Keluar Sesi
           </button>
         </div>

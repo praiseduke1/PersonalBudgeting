@@ -1,7 +1,7 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 import { supabase } from '../../lib/supabaseClient'
-import { Category, Transaction } from '../../types'
+import { Category, Transaction, Account } from '../../types'
 
 interface TransactionFormProps {
   userId: string
@@ -22,16 +22,25 @@ export default function TransactionForm({ userId, categories, editTransaction, o
   )
   const [desc, setDesc] = React.useState(editTransaction?.description || '')
   const [error, setError] = React.useState('')
+  const [accounts, setAccounts] = useState<Account[]>([])
+  const [accountId, setAccountId] = React.useState('')
+
+  useEffect(() => {
+    supabase.from('accounts').select('*').eq('user_id', userId).eq('is_active', true).then(({ data }) => {
+      if (data) setAccounts(data as Account[])
+    })
+  }, [userId])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!amount || isNaN(Number(amount)) || !category) return
 
-    const payload = {
+    const payload: any = {
       category_id: category,
       amount: Number(amount),
       transaction_date: date,
-      description: desc || null
+      description: desc || null,
+      account_id: accountId || null
     }
 
     let saveError
@@ -47,6 +56,12 @@ export default function TransactionForm({ userId, categories, editTransaction, o
       setError(saveError.message)
       toast.error(saveError.message)
       return
+    }
+
+    // Update balance jika terhubung ke akun
+    if (accountId) {
+      const balanceChange = type === 'income' ? Number(amount) : -Number(amount)
+      await supabase.rpc('update_account_balance', { p_account_id: accountId, p_amount: balanceChange })
     }
 
     toast.success(editTransaction ? 'Transaksi diperbarui' : 'Transaksi ditambahkan')
@@ -100,6 +115,17 @@ export default function TransactionForm({ userId, categories, editTransaction, o
               <option value="">Pilih kategori</option>
               {filteredCategories.map(c => (
                 <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Akun (opsional)</label>
+            <select className="form-input" value={accountId}
+              onChange={(e) => setAccountId(e.target.value)}>
+              <option value="">Tanpa akun</option>
+              {accounts.map(a => (
+                <option key={a.id} value={a.id}>{a.name}</option>
               ))}
             </select>
           </div>

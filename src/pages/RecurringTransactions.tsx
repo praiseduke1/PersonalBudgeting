@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabaseClient'
 import { Category, RecurringTransaction } from '../types'
 import toast from 'react-hot-toast'
-import { RotateCcw, Plus, Pencil, Trash2, X, Check, Loader2, ToggleLeft, ToggleRight, ArrowLeft } from 'lucide-react'
+import { RotateCcw, Plus, Pencil, Trash2, X, Check, Loader2, ToggleLeft, ToggleRight, ArrowLeft, Play } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { formatCurrency, formatDate } from '../utils/format'
 import { fetchCategories } from '../utils/supabase'
@@ -45,6 +45,7 @@ export default function RecurringTransactionsPage() {
   const [editing, setEditing] = useState<RecurringTransaction | null>(null)
   const [form, setForm] = useState<FormData>(emptyForm)
   const [saving, setSaving] = useState(false)
+  const [applying, setApplying] = useState<string | null>(null)
 
   const loadData = async () => {
     if (!user) return
@@ -124,6 +125,32 @@ export default function RecurringTransactionsPage() {
     else { toast.success('Dihapus'); loadData() }
   }
 
+  const handleApply = async (item: RecurringTransaction) => {
+    setApplying(item.id)
+    const { error } = await supabase.from('transactions').insert({
+      user_id: user!.id,
+      category_id: item.category_id,
+      amount: item.amount,
+      transaction_date: new Date().toISOString().split('T')[0],
+      description: `[Berulang] ${item.description || ''}`
+    })
+    if (error) toast.error('Gagal menerapkan: ' + error.message)
+    else {
+      toast.success(`Transaksi ${formatCurrency(item.amount)} telah ditambahkan`)
+      // Update next_date based on frequency
+      const nextDate = new Date(item.next_date)
+      switch (item.frequency) {
+        case 'daily': nextDate.setDate(nextDate.getDate() + 1); break
+        case 'weekly': nextDate.setDate(nextDate.getDate() + 7); break
+        case 'monthly': nextDate.setMonth(nextDate.getMonth() + 1); break
+        case 'yearly': nextDate.setFullYear(nextDate.getFullYear() + 1); break
+      }
+      await supabase.from('recurring_transactions').update({ next_date: nextDate.toISOString().split('T')[0] }).eq('id', item.id)
+      loadData()
+    }
+    setApplying(null)
+  }
+
   const filteredCategories = categories.filter(c => c.type === form.type)
 
   return (
@@ -164,6 +191,7 @@ export default function RecurringTransactionsPage() {
                   <th>Frekuensi</th>
                   <th>Berikutnya</th>
                   <th>Status</th>
+                  <th style={{ width: '60px' }}>Apply</th>
                   <th style={{ width: '100px' }}>Aksi</th>
                 </tr>
               </thead>
@@ -186,6 +214,15 @@ export default function RecurringTransactionsPage() {
                         style={{ background: 'none', border: 'none', cursor: 'pointer', color: item.is_active ? 'var(--success)' : 'var(--text-muted)' }}>
                         {item.is_active ? <ToggleRight size={20} /> : <ToggleLeft size={20} />}
                       </button>
+                    </td>
+                    <td>
+                      {item.is_active && (
+                        <button onClick={() => handleApply(item)} disabled={applying === item.id}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--success)', padding: '0.25rem' }}
+                          title="Terapkan sekarang">
+                          {applying === item.id ? <Loader2 size={16} className="pulse" /> : <Play size={16} />}
+                        </button>
+                      )}
                     </td>
                     <td>
                       <div style={{ display: 'flex', gap: '0.25rem' }}>
