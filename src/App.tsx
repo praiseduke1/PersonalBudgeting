@@ -1,5 +1,6 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useAuth } from './context/AuthContext'
+import { supabase } from './lib/supabaseClient'
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -9,24 +10,24 @@ import {
   User as UserIcon, 
   AlertTriangle,
   RefreshCw,
-  FolderPlus,
   Coins
 } from 'lucide-react'
 
-// Mock Data untuk Demo Mode jika Supabase belum terhubung atau dalam mode sandbox
-const MOCK_TRANSACTIONS = [
-  { id: '1', type: 'expense', amount: 150000, category: 'Makanan', transaction_date: '2026-06-02', description: 'Makan siang Nasi Padang' },
-  { id: '2', type: 'income', amount: 5000000, category: 'Gaji', transaction_date: '2026-06-01', description: 'Gaji Bulanan Utama' },
-  { id: '3', type: 'expense', amount: 200000, category: 'Transportasi', transaction_date: '2026-05-31', description: 'Bensin & Tol' },
-  { id: '4', type: 'expense', amount: 350000, category: 'Belanja', transaction_date: '2026-05-30', description: 'Belanja bulanan minimarket' },
-]
+interface Transaction {
+  id: string
+  type: 'income' | 'expense'
+  amount: number
+  category: string
+  category_id: string
+  transaction_date: string
+  description: string | null
+}
 
-const MOCK_CATEGORIES = [
-  { id: 'c1', name: 'Makanan', type: 'expense' },
-  { id: 'c2', name: 'Gaji', type: 'income' },
-  { id: 'c3', name: 'Transportasi', type: 'expense' },
-  { id: 'c4', name: 'Belanja', type: 'expense' },
-]
+interface Category {
+  id: string
+  name: string
+  type: 'income' | 'expense'
+}
 
 export default function App() {
   const { user, profile, loading, signOut, refreshProfile } = useAuth()
@@ -40,22 +41,64 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(false)
   const [authSuccess, setAuthSuccess] = useState('')
 
-  // State untuk Input Transaksi Baru (Demo / Live)
+  // State untuk Input Transaksi Baru
   const [showAddForm, setShowAddForm] = useState(false)
   const [txType, setTxType] = useState<'income' | 'expense'>('expense')
   const [txAmount, setTxAmount] = useState('')
-  const [txCategory, setTxCategory] = useState('Makanan')
+  const [txCategory, setTxCategory] = useState('')
   const [txDate, setTxDate] = useState(new Date().toISOString().split('T')[0])
   const [txDesc, setTxDesc] = useState('')
-  const [transactions, setTransactions] = useState(MOCK_TRANSACTIONS)
+  
+  // Data dari Supabase
+  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
+  const [dataLoading, setDataLoading] = useState(false)
   
   // Settings & Budget State
-  const [monthlyBudget, setMonthlyBudget] = useState(2500000) // Default 2.5jt
   const [editingBudget, setEditingBudget] = useState(false)
-  const [tempBudget, setTempBudget] = useState('2500000')
+  const [tempBudget, setTempBudget] = useState('')
 
-  // Cek apakah Supabase terhubung dengan kredensial real
-  const isSupabasePlaceholder = import.meta.env.VITE_SUPABASE_URL?.includes('placeholder-url') || !import.meta.env.VITE_SUPABASE_URL
+  const fetchData = useCallback(async () => {
+    if (!user) return
+    setDataLoading(true)
+
+    const [txResult, catResult] = await Promise.all([
+      supabase
+        .from('transactions')
+        .select('*, categories(name, type)')
+        .eq('user_id', user.id)
+        .order('transaction_date', { ascending: false })
+        .limit(50),
+      supabase
+        .from('categories')
+        .select('*')
+        .eq('user_id', user.id)
+    ])
+
+    if (!txResult.error && txResult.data) {
+      setTransactions(txResult.data.map(t => ({
+        id: t.id,
+        type: (t.categories as any)?.type || 'expense',
+        amount: Number(t.amount),
+        category: (t.categories as any)?.name || 'Unknown',
+        category_id: t.category_id,
+        transaction_date: t.transaction_date,
+        description: t.description
+      })))
+    }
+
+    if (!catResult.error && catResult.data) {
+      setCategories(catResult.data as Category[])
+    }
+
+    setDataLoading(false)
+  }, [user])
+
+  useEffect(() => {
+    if (user) {
+      fetchData()
+    }
+  }, [user, fetchData])
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -63,22 +106,9 @@ export default function App() {
     setAuthSuccess('')
     setAuthLoading(true)
 
-    if (isSupabasePlaceholder) {
-      // Mock Authentication untuk Demo Mode
-      setTimeout(() => {
-        setAuthLoading(false)
-        setAuthSuccess('Demo Mode Aktif! Hubungkan Supabase Anda untuk menyimpan data secara permanen.')
-        // Auto-login di demo mode setelah beberapa detik
-        alert('Anda sedang menggunakan Demo Mode karena Supabase URL belum dikonfigurasi. Menampilkan dashboard demo...')
-        window.location.reload()
-      }, 1000)
-      return
-    }
-
     try {
       if (isRegister) {
-        // Sign Up dengan metadata nama lengkap
-        const { error } = await import('./lib/supabaseClient').then(m => m.supabase.auth.signUp({
+        const { error } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -86,15 +116,14 @@ export default function App() {
               full_name: fullName,
             }
           }
-        }))
+        })
         if (error) throw error
-        setAuthSuccess('Registrasi berhasil! Silakan cek email Anda untuk verifikasi konfirmasi (jika diaktifkan) atau masuk ke akun Anda.')
+        setAuthSuccess('Registrasi berhasil! Silakan cek email Anda untuk verifikasi (jika diaktifkan) atau masuk ke akun Anda.')
       } else {
-        // Sign In
-        const { error } = await import('./lib/supabaseClient').then(m => m.supabase.auth.signInWithPassword({
+        const { error } = await supabase.auth.signInWithPassword({
           email,
           password,
-        }))
+        })
         if (error) throw error
       }
     } catch (err: any) {
@@ -104,29 +133,43 @@ export default function App() {
     }
   }
 
-  const handleAddTransaction = (e: React.FormEvent) => {
+  const handleAddTransaction = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!txAmount || isNaN(Number(txAmount))) return
+    if (!txAmount || isNaN(Number(txAmount)) || !txCategory) return
 
-    const newTx = {
-      id: Math.random().toString(),
-      type: txType,
+    const selectedCat = categories.find(c => c.id === txCategory)
+    if (!selectedCat) return
+
+    const { error } = await supabase.from('transactions').insert({
+      user_id: user!.id,
+      category_id: txCategory,
       amount: Number(txAmount),
-      category: txCategory,
       transaction_date: txDate,
-      description: txDesc
+      description: txDesc || null
+    })
+
+    if (error) {
+      setAuthError('Gagal menyimpan transaksi: ' + error.message)
+      return
     }
 
-    setTransactions([newTx, ...transactions])
     setTxAmount('')
     setTxDesc('')
     setShowAddForm(false)
+    fetchData()
   }
 
-  const handleUpdateBudget = () => {
+  const handleUpdateBudget = async () => {
     const val = Number(tempBudget)
-    if (!isNaN(val) && val >= 0) {
-      setMonthlyBudget(val)
+    if (isNaN(val) || val < 0) return
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({ monthly_budget: val })
+      .eq('id', user!.id)
+
+    if (!error) {
+      refreshProfile()
       setEditingBudget(false)
     }
   }
@@ -141,10 +184,9 @@ export default function App() {
     .reduce((sum, t) => sum + t.amount, 0)
 
   const balance = totalIncome - totalExpense
-  const actualBudget = profile?.monthly_budget ?? monthlyBudget
+  const actualBudget = profile?.monthly_budget ?? 2500000
   const budgetPercentage = Math.min(Math.round((totalExpense / actualBudget) * 100), 100)
 
-  // Tentukan warna progress bar berdasarkan persentase anggaran yang terpakai
   const getProgressBarColor = (percentage: number) => {
     if (percentage >= 90) return 'var(--danger)'
     if (percentage >= 70) return 'var(--warning)'
@@ -162,8 +204,6 @@ export default function App() {
     )
   }
 
-  // JIKA BELUM LOGIN (DAN BUKAN DEMO MODE DENGAN MOCK)
-  // Catatan: Jika session kosong, tampilkan form login
   if (!user) {
     return (
       <div className="auth-layout">
@@ -177,25 +217,6 @@ export default function App() {
               <p style={{ fontSize: '0.8rem', marginTop: '-2px' }}>Multi-Tenant Personal Budgeting</p>
             </div>
           </div>
-
-          {isSupabasePlaceholder && (
-            <div style={{ 
-              background: 'rgba(245, 158, 11, 0.1)', 
-              border: '1px solid rgba(245, 158, 11, 0.3)', 
-              borderRadius: 'var(--radius-md)', 
-              padding: '0.75rem', 
-              marginBottom: '1rem',
-              fontSize: '0.85rem',
-              color: 'var(--warning)'
-            }}>
-              <div style={{ display: 'flex', gap: '0.5rem', fontWeight: 'bold' }}>
-                <AlertTriangle size={16} /> Mode Demo Aktif
-              </div>
-              <p style={{ marginTop: '0.25rem', fontSize: '0.8rem' }}>
-                Kredensial Supabase belum diatur di file <code>.env</code>. Anda dapat menguji interface ini secara bebas.
-              </p>
-            </div>
-          )}
 
           <h3 style={{ marginBottom: '0.5rem', textAlign: 'center' }}>
             {isRegister ? 'Buat Akun Baru' : 'Masuk ke Aplikasi'}
@@ -341,25 +362,6 @@ export default function App() {
             <PlusCircle size={18} /> Catat Transaksi
           </button>
         </header>
-
-        {isSupabasePlaceholder && (
-          <div style={{ 
-            background: 'rgba(99, 102, 241, 0.1)', 
-            border: '1px solid rgba(99, 102, 241, 0.2)', 
-            borderRadius: 'var(--radius-md)', 
-            padding: '1rem', 
-            marginBottom: '2rem',
-            color: 'var(--text-main)'
-          }}>
-            <h4 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--primary)', marginBottom: '0.25rem' }}>
-              <AlertTriangle size={18} /> Anda Berada dalam Mode Demo Lokal
-            </h4>
-            <p style={{ fontSize: '0.9rem' }}>
-              Aplikasi berjalan dengan mock data karena Supabase belum dikonfigurasi secara langsung.
-              Ubah kredensial di file <code>.env</code> untuk mengaktifkan sinkronisasi database relasional Supabase yang terisolasi dengan RLS.
-            </p>
-          </div>
-        )}
 
         {/* Ringkasan Anggaran (Batas Anggaran) */}
         <section className="card card-premium" style={{ marginBottom: '2rem' }}>
@@ -513,9 +515,11 @@ export default function App() {
                     className="form-input" 
                     value={txCategory} 
                     onChange={(e) => setTxCategory(e.target.value)}
+                    required
                   >
-                    {MOCK_CATEGORIES.map(c => (
-                      <option key={c.id} value={c.name}>{c.name}</option>
+                    <option value="">Pilih kategori</option>
+                    {categories.filter(c => c.type === txType).map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
                     ))}
                   </select>
                 </div>
