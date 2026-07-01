@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from './context/AuthContext'
 import { supabase } from './lib/supabaseClient'
 import toast from 'react-hot-toast'
-import { PlusCircle, RefreshCw } from 'lucide-react'
+import { PlusCircle, RefreshCw, AlertTriangle } from 'lucide-react'
 import ExpensePieChart from './components/dashboard/ExpensePieChart'
 import MonthlyTrendChart from './components/dashboard/MonthlyTrendChart'
 import { Transaction, Category } from './types'
@@ -14,6 +14,7 @@ import BudgetSection from './components/dashboard/BudgetSection'
 import SummaryCards from './components/dashboard/SummaryCards'
 import TransactionForm from './components/dashboard/TransactionForm'
 import TransactionTable from './components/dashboard/TransactionTable'
+import ErrorAlert from './components/common/ErrorAlert'
 
 export default function App() {
   const { user, profile, loading, signOut, refreshProfile } = useAuth()
@@ -22,11 +23,13 @@ export default function App() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [dataLoading, setDataLoading] = useState(false)
+  const [fetchError, setFetchError] = useState('')
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7))
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (retries = 2) => {
     if (!user) return
     setDataLoading(true)
+    setFetchError('')
 
     const startDate = selectedMonth + '-01'
     const endDate = new Date(new Date(startDate).getTime() + 31 * 24 * 60 * 60 * 1000)
@@ -47,7 +50,14 @@ export default function App() {
         .eq('user_id', user.id)
     ])
 
-    if (!txResult.error && txResult.data) {
+    if (txResult.error) {
+      if (retries > 0) {
+        setTimeout(() => fetchData(retries - 1), 1500)
+        return
+      }
+      setFetchError('Gagal memuat transaksi: ' + txResult.error.message)
+      toast.error('Gagal memuat data transaksi')
+    } else if (txResult.data) {
       setTransactions(txResult.data.map(t => ({
         id: t.id,
         type: (t.categories as any)?.type || 'expense',
@@ -59,7 +69,10 @@ export default function App() {
       })))
     }
 
-    if (!catResult.error && catResult.data) {
+    if (catResult.error) {
+      setFetchError(prev => prev || 'Gagal memuat kategori')
+      toast.error('Gagal memuat data kategori')
+    } else if (catResult.data) {
       setCategories(catResult.data as Category[])
     }
 
@@ -120,6 +133,10 @@ export default function App() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
                 <RefreshCw className="pulse" size={16} /> Memuat data...
               </div>
+            )}
+
+            {fetchError && (
+              <ErrorAlert message={fetchError} onRetry={() => fetchData()} />
             )}
 
             <BudgetSection
