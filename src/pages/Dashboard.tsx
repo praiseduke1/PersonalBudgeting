@@ -3,7 +3,7 @@ import { useOutletContext } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabaseClient'
 import toast from 'react-hot-toast'
-import { PlusCircle, RefreshCw, Menu } from 'lucide-react'
+import { PlusCircle, RefreshCw, Menu, Tags } from 'lucide-react'
 import ExpensePieChart from '../components/dashboard/ExpensePieChart'
 import MonthlyTrendChart from '../components/dashboard/MonthlyTrendChart'
 import { Transaction, Category } from '../types'
@@ -12,6 +12,7 @@ import BudgetSection from '../components/dashboard/BudgetSection'
 import SummaryCards from '../components/dashboard/SummaryCards'
 import TransactionForm from '../components/dashboard/TransactionForm'
 import TransactionTable from '../components/dashboard/TransactionTable'
+import CategoryManager from '../components/dashboard/CategoryManager'
 import ErrorAlert from '../components/common/ErrorAlert'
 
 const PAGE_SIZE = 20
@@ -33,6 +34,7 @@ export default function Dashboard() {
   const [fetchError, setFetchError] = useState('')
   const [hasMore, setHasMore] = useState(true)
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7))
+  const [showCategoryManager, setShowCategoryManager] = useState(false)
   const monthRef = useRef(selectedMonth)
 
   const fetchData = useCallback(async (page = 0, append = false) => {
@@ -142,6 +144,14 @@ export default function Dashboard() {
             <PlusCircle size={18} />
             <span className="hidden sm:inline">Catat Transaksi</span>
           </button>
+          <button
+            onClick={() => setShowCategoryManager(true)}
+            className="btn btn-secondary"
+            style={{ padding: '0.5rem 0.75rem', lineHeight: 0 }}
+            title="Atur Kategori"
+          >
+            <Tags size={18} />
+          </button>
         </div>
       </header>
 
@@ -189,6 +199,15 @@ export default function Dashboard() {
               editTransaction={editingTx}
               onSaved={() => { setShowForm(false); setEditingTx(null); fetchData(0) }}
               onClose={() => { setShowForm(false); setEditingTx(null) }}
+            />
+          )}
+
+          {showCategoryManager && (
+            <CategoryManager
+              categories={categories}
+              userId={user?.id ?? ''}
+              onRefresh={() => fetchData(0)}
+              onClose={() => setShowCategoryManager(false)}
             />
           )}
 
