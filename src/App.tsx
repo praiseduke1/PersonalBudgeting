@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from './context/AuthContext'
 import { supabase } from './lib/supabaseClient'
 import toast from 'react-hot-toast'
-import { PlusCircle, RefreshCw, AlertTriangle } from 'lucide-react'
+import { PlusCircle, RefreshCw, AlertTriangle, Menu } from 'lucide-react'
 import ExpensePieChart from './components/dashboard/ExpensePieChart'
 import MonthlyTrendChart from './components/dashboard/MonthlyTrendChart'
 import { Transaction, Category } from './types'
@@ -25,6 +25,7 @@ export default function App() {
   const [dataLoading, setDataLoading] = useState(false)
   const [fetchError, setFetchError] = useState('')
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7))
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const fetchData = useCallback(async (retries = 2) => {
     if (!user) return
@@ -106,13 +107,22 @@ export default function App() {
 
   return (
     <div className="app-container">
-      <Sidebar user={user} profile={profile} signOut={signOut} />
+      <Sidebar user={user} profile={profile} signOut={signOut} open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       <main className="main-content">
-        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', gap: '0.75rem' }}>
           <div>
-            <h1>Dashboard Finansial</h1>
-            <p>Selamat datang kembali! Lacak dan kelola anggaran bulanan Anda di sini.</p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <button onClick={() => setSidebarOpen(true)} className="hamburger-btn"
+                aria-label="Buka menu"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-main)', padding: '0.25rem', lineHeight: 0, display: 'none' }}>
+                <Menu size={24} />
+              </button>
+              <div>
+                <h1>Dashboard Finansial</h1>
+                <p>Selamat datang kembali! Lacak dan kelola anggaran bulanan Anda di sini.</p>
+              </div>
+            </div>
           </div>
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
             <input type="month" className="form-input"
@@ -120,7 +130,7 @@ export default function App() {
               value={selectedMonth}
               onChange={(e) => setSelectedMonth(e.target.value)} />
             <button onClick={() => { setEditingTx(null); setShowForm(true); }} className="btn btn-primary">
-              <PlusCircle size={18} /> Catat Transaksi
+              <PlusCircle size={18} /> <span className="hide-mobile">Catat Transaksi</span>
             </button>
           </div>
         </header>
