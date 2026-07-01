@@ -18,16 +18,23 @@ export default function App() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [dataLoading, setDataLoading] = useState(false)
+  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7))
 
   const fetchData = useCallback(async () => {
     if (!user) return
     setDataLoading(true)
+
+    const startDate = selectedMonth + '-01'
+    const endDate = new Date(new Date(startDate).getTime() + 31 * 24 * 60 * 60 * 1000)
+      .toISOString().slice(0, 10)
 
     const [txResult, catResult] = await Promise.all([
       supabase
         .from('transactions')
         .select('*, categories(name, type)')
         .eq('user_id', user.id)
+        .gte('transaction_date', startDate)
+        .lt('transaction_date', endDate)
         .order('transaction_date', { ascending: false })
         .limit(50),
       supabase
@@ -53,7 +60,7 @@ export default function App() {
     }
 
     setDataLoading(false)
-  }, [user])
+  }, [user, selectedMonth])
 
   useEffect(() => {
     if (user) {
@@ -90,9 +97,15 @@ export default function App() {
             <h1>Dashboard Finansial</h1>
             <p>Selamat datang kembali! Lacak dan kelola anggaran bulanan Anda di sini.</p>
           </div>
-          <button onClick={() => { setEditingTx(null); setShowForm(true); }} className="btn btn-primary">
-            <PlusCircle size={18} /> Catat Transaksi
-          </button>
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+            <input type="month" className="form-input"
+              style={{ width: 'auto', padding: '0.5rem 0.75rem' }}
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)} />
+            <button onClick={() => { setEditingTx(null); setShowForm(true); }} className="btn btn-primary">
+              <PlusCircle size={18} /> Catat Transaksi
+            </button>
+          </div>
         </header>
 
         {dataLoading && (
