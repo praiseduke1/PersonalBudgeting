@@ -1,6 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
-import LoadingScreen from './components/common/LoadingScreen'
 import AuthForm from './components/common/AuthForm'
 import AppLayout from './components/layout/AppLayout'
 import Dashboard from './pages/Dashboard'
@@ -14,9 +13,8 @@ import NetWorthPage from './pages/NetWorth'
 import BudgetCategoriesPage from './pages/BudgetCategoriesPage'
 
 export default function App() {
-  const { user, loading } = useAuth()
+  const { user } = useAuth()
 
-  if (loading) return <LoadingScreen />
   if (!user) return <AuthForm />
 
   return (

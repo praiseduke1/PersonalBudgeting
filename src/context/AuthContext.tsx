@@ -20,11 +20,24 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
+// Coba baca session dari localStorage langsung (synchronous)
+function getStoredSession(): Session | null {
+  try {
+    const raw = localStorage.getItem('sb-vonqbibvkxmetyvzcqeo-auth-token')
+    if (!raw) return null
+    return JSON.parse(raw) as Session
+  } catch {
+    return null
+  }
+}
+
+const storedSession = getStoredSession()
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null)
-  const [session, setSession] = useState<Session | null>(null)
+  const [user, setUser] = useState<User | null>(storedSession?.user ?? null)
+  const [session, setSession] = useState<Session | null>(storedSession)
   const [profile, setProfile] = useState<Profile | null>(null)
-  const [loading, setLoading] = useState<boolean>(true)
+  const [loading, setLoading] = useState<boolean>(false)
 
   const fetchProfile = async (userId: string) => {
     try {
@@ -64,47 +77,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }
 
   useEffect(() => {
-    let cancelled = false
-
-    // 1. Ambil session aktif saat pertama kali load, dengan timeout
-    const timeout = setTimeout(() => {
-      if (!cancelled) setLoading(false)
-    }, 8000)
-
+    // Verifikasi session di background (tidak blocking UI)
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (cancelled) return
-      clearTimeout(timeout)
       setSession(session)
       setUser(session?.user ?? null)
       if (session?.user) {
         fetchProfile(session.user.id)
       }
-      setLoading(false)
-    }).catch(() => {
-      if (!cancelled) { clearTimeout(timeout); setLoading(false) }
-    })
+    }).catch(() => {})
 
-    // 2. Dengarkan perubahan status autentikasi (login, logout, token refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, currentSession) => {
-        if (cancelled) return
         setSession(currentSession)
         setUser(currentSession?.user ?? null)
-        
         if (currentSession?.user) {
           await fetchProfile(currentSession.user.id)
         } else {
           setProfile(null)
         }
-        
-        setLoading(false)
       }
     )
 
-    return () => {
-      cancelled = true
-      subscription.unsubscribe()
-    }
+    return () => { subscription.unsubscribe() }
   }, [])
 
   const value = {
