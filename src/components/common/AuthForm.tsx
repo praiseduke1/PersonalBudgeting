@@ -1,4 +1,5 @@
 import React from 'react'
+import toast from 'react-hot-toast'
 import { supabase } from '../../lib/supabaseClient'
 import { Coins } from 'lucide-react'
 
@@ -29,14 +30,16 @@ export default function AuthForm({ onAuthSuccess }: AuthFormProps) {
           options: { data: { full_name: fullName } }
         })
         if (signUpError) throw signUpError
-        setSuccess('Registrasi berhasil! Silakan cek email Anda untuk verifikasi atau masuk ke akun Anda.')
+        toast.success('Registrasi berhasil! Silakan cek email untuk verifikasi.')
       } else {
         const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
         if (signInError) throw signInError
+        toast.success('Login berhasil!')
         onAuthSuccess?.()
       }
     } catch (err: any) {
       setError(err.message || 'Terjadi kesalahan sistem.')
+      toast.error(err.message || 'Terjadi kesalahan sistem.')
     } finally {
       setLoading(false)
     }

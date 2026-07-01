@@ -1,4 +1,5 @@
 import React from 'react'
+import toast from 'react-hot-toast'
 import { supabase } from '../../lib/supabaseClient'
 import { Category, Transaction } from '../../types'
 
@@ -44,9 +45,11 @@ export default function TransactionForm({ userId, categories, editTransaction, o
 
     if (saveError) {
       setError(saveError.message)
+      toast.error(saveError.message)
       return
     }
 
+    toast.success(editTransaction ? 'Transaksi diperbarui' : 'Transaksi ditambahkan')
     onSaved()
   }
 

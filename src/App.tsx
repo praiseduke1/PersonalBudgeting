@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from './context/AuthContext'
 import { supabase } from './lib/supabaseClient'
-import { PlusCircle, RefreshCw, BarChart3, PieChart as PieChartIcon } from 'lucide-react'
+import toast from 'react-hot-toast'
+import { PlusCircle, RefreshCw } from 'lucide-react'
 import ExpensePieChart from './components/dashboard/ExpensePieChart'
 import MonthlyTrendChart from './components/dashboard/MonthlyTrendChart'
 import { Transaction, Category } from './types'
@@ -149,8 +150,13 @@ export default function App() {
           onEdit={(t) => { setEditingTx(t); setShowForm(true) }}
           onDelete={async (id) => {
             if (!confirm('Hapus transaksi ini?')) return
-            await supabase.from('transactions').delete().eq('id', id)
-            fetchData()
+            const { error } = await supabase.from('transactions').delete().eq('id', id)
+            if (error) {
+              toast.error('Gagal menghapus: ' + error.message)
+            } else {
+              toast.success('Transaksi dihapus')
+              fetchData()
+            }
           }}
         />
       </main>

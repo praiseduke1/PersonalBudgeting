@@ -1,4 +1,5 @@
 import React from 'react'
+import toast from 'react-hot-toast'
 import { supabase } from '../../lib/supabaseClient'
 import { AlertTriangle } from 'lucide-react'
 
@@ -33,7 +34,10 @@ export default function BudgetSection({ userId, actualBudget, totalExpense, onBu
 
     if (!error) {
       setEditing(false)
+      toast.success('Anggaran bulanan diperbarui')
       onBudgetUpdated()
+    } else {
+      toast.error('Gagal memperbarui anggaran')
     }
   }
 
