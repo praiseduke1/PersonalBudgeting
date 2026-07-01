@@ -176,6 +176,14 @@ export default function Dashboard() {
             onEdit={(t) => { setEditingTx(t); setShowForm(true) }}
             onDelete={async (id) => {
               if (!confirm('Hapus transaksi ini?')) return
+              const { data: tx } = await supabase.from('transactions').select('*').eq('id', id).single()
+              if (tx && tx.account_id) {
+                const reverseChange = tx.type === 'income' ? -tx.amount : tx.amount
+                const { data: acc } = await supabase.from('accounts').select('balance').eq('id', tx.account_id).single()
+                if (acc) {
+                  await supabase.from('accounts').update({ balance: Number(acc.balance) + reverseChange }).eq('id', tx.account_id)
+                }
+              }
               const { error } = await supabase.from('transactions').delete().eq('id', id)
               if (error) toast.error('Gagal menghapus: ' + error.message)
               else { toast.success('Transaksi dihapus'); refresh() }

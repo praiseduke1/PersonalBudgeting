@@ -85,23 +85,28 @@ export default function AccountsPage() {
     if (transferForm.from_account_id === transferForm.to_account_id) { toast.error('Akun asal dan tujuan harus berbeda'); return }
     setSaving(true)
     const amount = Number(transferForm.amount)
-    const { error } = await supabase.rpc('transfer_between_accounts', {
-      p_user_id: user.id,
-      p_from_account_id: transferForm.from_account_id,
-      p_to_account_id: transferForm.to_account_id,
-      p_amount: amount,
-      p_description: transferForm.description || null,
-      p_transfer_date: transferForm.transfer_date
-    })
-    if (error) {
-      const { error: directError } = await supabase.from('account_transfers').insert({
-        user_id: user.id, from_account_id: transferForm.from_account_id, to_account_id: transferForm.to_account_id,
-        amount, description: transferForm.description || null, transfer_date: transferForm.transfer_date
-      })
-      if (directError) { toast.error('Gagal transfer: ' + directError.message); setSaving(false); return }
-      await supabase.rpc('update_account_balance', { p_account_id: transferForm.from_account_id, p_amount: -amount })
-      await supabase.rpc('update_account_balance', { p_account_id: transferForm.to_account_id, p_amount: amount })
+
+    // Cek saldo cukup
+    const { data: fromAcc } = await supabase.from('accounts').select('balance').eq('id', transferForm.from_account_id).single()
+    if (!fromAcc || Number(fromAcc.balance) < amount) {
+      toast.error('Saldo akun asal tidak mencukupi'); setSaving(false); return
     }
+
+    // Kurang saldo asal
+    const { error: errFrom } = await supabase.from('accounts').update({ balance: Number(fromAcc.balance) - amount }).eq('id', transferForm.from_account_id)
+    if (errFrom) { toast.error('Gagal transfer: ' + errFrom.message); setSaving(false); return }
+
+    // Tambah saldo tujuan
+    const { data: toAcc } = await supabase.from('accounts').select('balance').eq('id', transferForm.to_account_id).single()
+    const { error: errTo } = await supabase.from('accounts').update({ balance: Number(toAcc?.balance || 0) + amount }).eq('id', transferForm.to_account_id)
+    if (errTo) { toast.error('Gagal transfer: ' + errTo.message); setSaving(false); return }
+
+    // Catat transfer
+    await supabase.from('account_transfers').insert({
+      user_id: user.id, from_account_id: transferForm.from_account_id, to_account_id: transferForm.to_account_id,
+      amount, description: transferForm.description || null, transfer_date: transferForm.transfer_date
+    })
+
     toast.success('Transfer berhasil')
     setShowTransfer(false)
     setTransferForm({ from_account_id: '', to_account_id: '', amount: '', description: '', transfer_date: new Date().toISOString().split('T')[0] })

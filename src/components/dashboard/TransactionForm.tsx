@@ -31,6 +31,13 @@ export default function TransactionForm({ userId, categories, editTransaction, o
     })
   }, [userId])
 
+  const updateAccountBalance = async (accId: string, change: number) => {
+    const { data: account } = await supabase.from('accounts').select('balance').eq('id', accId).single()
+    if (account) {
+      await supabase.from('accounts').update({ balance: Number(account.balance) + change }).eq('id', accId)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!amount || isNaN(Number(amount)) || !category) return
@@ -43,25 +50,22 @@ export default function TransactionForm({ userId, categories, editTransaction, o
       account_id: accountId || null
     }
 
-    let saveError
     if (editTransaction) {
+      // Reverse balance from old transaction
+      if (editTransaction.account_id) {
+        const oldChange = editTransaction.type === 'income' ? -editTransaction.amount : editTransaction.amount
+        await updateAccountBalance(editTransaction.account_id, oldChange)
+      }
       const { error } = await supabase.from('transactions').update(payload).eq('id', editTransaction.id)
-      saveError = error
+      if (error) { setError(error.message); toast.error(error.message); return }
     } else {
       const { error } = await supabase.from('transactions').insert({ ...payload, user_id: userId })
-      saveError = error
+      if (error) { setError(error.message); toast.error(error.message); return }
     }
 
-    if (saveError) {
-      setError(saveError.message)
-      toast.error(saveError.message)
-      return
-    }
-
-    // Update balance jika terhubung ke akun
     if (accountId) {
       const balanceChange = type === 'income' ? Number(amount) : -Number(amount)
-      await supabase.rpc('update_account_balance', { p_account_id: accountId, p_amount: balanceChange })
+      await updateAccountBalance(accountId, balanceChange)
     }
 
     toast.success(editTransaction ? 'Transaksi diperbarui' : 'Transaksi ditambahkan')
